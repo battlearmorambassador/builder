@@ -88,10 +88,15 @@
   </header>
   <div class="pick-tools">
     <input id="search" class="input search" type="search" placeholder="Search by name or path…" autocomplete="off" spellcheck="false">
-    <div class="subcats" id="subcats"></div>
+    <div class="pick-row"><div class="subcats" id="subcats"></div><button class="btn btn-ghost" id="btn-multi" type="button">Select multiple</button></div>
   </div>
   <div id="pick-status" class="status"></div>
   <div id="grid" class="grid"></div>
+  <div class="multi-bar" id="multi-bar" hidden>
+    <span id="multi-count"></span>
+    <button class="btn btn-ghost" id="multi-clear" type="button">Clear</button>
+    <button class="btn btn-primary" id="multi-open" type="button" disabled>Open patch</button>
+  </div>
 </section>
 
 <section id="view-edit" class="view" hidden>
@@ -109,7 +114,7 @@
         <div>Currently creating a patch for <strong id="target-name"></strong></div>
         <code id="target-path"></code>
         <div class="opts">
-        <label class="check"><input type="checkbox" id="also-store"> <span>Also edit StoreItem?</span> <code id="store-path" class="muted"></code></label>
+        <label class="check" id="store-opt"><input type="checkbox" id="also-store"> <span>Also edit StoreItem?</span> <code id="store-path" class="muted"></code></label>
         <div class="cond">
           <label class="check"><input type="checkbox" id="cond-on"> <span>Build version specific?</span></label>
           <span id="cond-opts" hidden>

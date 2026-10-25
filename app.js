@@ -262,7 +262,34 @@ function initHome() {
     h("span", { class: "nm" }, c.name), c.sub ? h("span", { class: "muted small" }, c.sub) : null)));
 }
 
-const pick = { cat: null, sub: null, items: [], shown: 0, filtered: [] };
+const pick = { cat: null, sub: null, items: [], shown: 0, filtered: [], multi: false, chosen: new Map() };
+
+function drawChosen() {
+  const n = pick.chosen.size;
+  $("#multi-bar").hidden = !pick.multi;
+  $("#multi-count").textContent = n ? `${n} selected` : "Click items to select them";
+  $("#multi-open").disabled = n < 2;
+  $("#btn-multi").classList.toggle("on", pick.multi);
+  $("#btn-multi").textContent = pick.multi ? "Cancel selection" : "Select multiple";
+}
+
+function initMulti() {
+  $("#btn-multi").onclick = () => {
+    pick.multi = !pick.multi;
+    if (!pick.multi) pick.chosen.clear();
+    for (const c of document.querySelectorAll("#grid .card")) c.classList.toggle("picked", pick.chosen.has(c.dataset.path));
+    drawChosen();
+  };
+  $("#multi-clear").onclick = () => {
+    pick.chosen.clear();
+    for (const c of document.querySelectorAll("#grid .card.picked")) c.classList.remove("picked");
+    drawChosen();
+  };
+  $("#multi-open").onclick = () => {
+    if (pick.chosen.size < 2) return;
+    location.hash = "#/edit?c=" + pick.cat + [...pick.chosen.keys()].map((p) => "&p=" + encodeURIComponent(p)).join("");
+  };
+}
 const PAGE = 180;
 
 async function showPicker(cat) {
@@ -270,6 +297,8 @@ async function showPicker(cat) {
   for (const b of $("#cats").children) b.classList.toggle("on", b.dataset.cat === cat);
   if (pick.cat !== cat) {
     pick.cat = cat;
+    pick.chosen.clear();
+    drawChosen();
     pick.sub = null;
     $("#grid").replaceChildren();
     $("#subcats").replaceChildren();
@@ -313,7 +342,12 @@ function morePicker() {
   const next = pick.filtered.slice(pick.shown, pick.shown + PAGE);
   pick.shown += next.length;
   grid.append(...next.map((it) =>
-    h("button", { class: "card", onclick: () => (location.hash = "#/edit?c=" + it.cat + "&p=" + encodeURIComponent(it.path)) },
+    h("button", { class: "card" + (pick.chosen.has(it.path) ? " picked" : ""), "data-path": it.path, onclick: (e) => {
+      if (!pick.multi) { location.hash = "#/edit?c=" + it.cat + "&p=" + encodeURIComponent(it.path); return; }
+      pick.chosen.has(it.path) ? pick.chosen.delete(it.path) : pick.chosen.set(it.path, it.name);
+      e.currentTarget.classList.toggle("picked", pick.chosen.has(it.path));
+      drawChosen();
+    } },
       it.icon ? h("img", { src: IMG + it.icon, loading: "lazy", alt: "", onerror: (e) => (e.target.style.visibility = "hidden") }) : h("img", { alt: "" }),
       h("span", { class: "nm" }, it.name),
     )));
@@ -404,7 +438,71 @@ function matchPath(here, there, path, exactLast) {
   return out;
 }
 
+class Mixed {}
+
+const realSides = () => Object.keys(ed.sides).filter((k) => k !== "all" && ed.sides[k]);
+
+function merge(vals) {
+  if (vals.every((x) => deepEq(x, vals[0]))) return clone(vals[0]);
+  if (vals.every((x) => Array.isArray(x) && x.length === vals[0].length)) return vals[0].map((_, i) => merge(vals.map((x) => x[i])));
+  if (vals.every((x) => isObj(x) && !Array.isArray(x)) && vals.every((x) => deepEq(Object.keys(x).sort(), Object.keys(vals[0]).sort())))
+    return Object.fromEntries(Object.keys(vals[0]).map((k) => [k, merge(vals.map((x) => x[k]))]));
+  return new Mixed();
+}
+
+function strip(v) {
+  if (v instanceof Mixed) return undefined;
+  if (Array.isArray(v)) {
+    const out = v.map(strip);
+    return out.includes(undefined) ? undefined : out;
+  }
+  if (isObj(v)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, strip(x)]).filter(([, x]) => x !== undefined));
+  return v;
+}
+
+function rebuildAll() {
+  const all = ed.sides.all, rs = realSides().map((k) => ed.sides[k]);
+  const shared = (pick) => Object.keys(pick(rs[0])).filter((k) => rs.every((r) => k in pick(r)));
+  const build = (pick) => Object.fromEntries(shared(pick).map((k) => [k, strip(merge(rs.map((r) => pick(r)[k])))]).filter(([, v]) => v !== undefined));
+  all.base = build((r) => r.base);
+  all.edit = build((r) => r.edit);
+  all.eff = all.base;
+  all.ownKeys = Object.keys(all.base);
+}
+
+function recordAll(op) {
+  const all = ed.sides.all;
+  const k = op.path[0];
+  for (const sn of realSides()) {
+    const r = ed.sides[sn];
+    let path = op.t === "addKey" || op.path.length === 1 ? op.path : matchPath(all.edit, r.edit, op.path, op.t === "del");
+    if (!path) continue;
+    let o = { ...op, path };
+    if (op.t === "del" && path.length === 1 && !r.ownKeys.includes(k)) {
+      const cur = r.edit[k];
+      if (!isObj(cur)) continue;
+      o = { t: "set", path, v: Array.isArray(cur) ? [] : {} };
+    }
+    if (o.t === "set" && op.path.length > 1 && isObj(getAt(r.edit, path))) continue;
+    if (o.t === "push") {
+      const arr = getAt(r.edit, path);
+      if (!Array.isArray(arr)) continue;
+      const shownArr = getAt(all.edit, op.path);
+      if (Array.isArray(shownArr) && shownArr.length && arr.length && deepEq(o.v, shownArr[shownArr.length - 1])) o = { ...o, v: clone(arr[arr.length - 1]) };
+    }
+    const rec = { ...o, side: sn };
+    let last = null;
+    for (let i = ed.ops.length - 1; i >= 0; i--) if (ed.ops[i].side === sn) { last = ed.ops[i]; break; }
+    if (rec.t === "set" && last && last.t === "set" && last.path.join(".") === path.join(".")) last.v = clone(rec.v);
+    else ed.ops.push(rec);
+    applyOp(r.edit, rec);
+  }
+  rebuildAll();
+  return ["all"];
+}
+
 function record(sn, op) {
+  if (sn === "all") return recordAll(op);
   const other = sn === "item" ? "store" : "item";
   const targets = [[sn, op.path]];
   const o = ed.sides[other];
@@ -430,9 +528,16 @@ function record(sn, op) {
 }
 
 function resetKey(sn, k) {
-  ed.ops = ed.ops.filter((o) => !(o.side === sn && o.path[0] === k));
-  replay(sn);
+  const targets = sn === "all" ? realSides() : [sn];
+  ed.ops = ed.ops.filter((o) => !(targets.includes(o.side) && o.path[0] === k));
+  for (const t of targets) replay(t);
+  if (ed.multi) rebuildAll();
   refresh();
+}
+
+function replayAll() {
+  for (const t of realSides()) replay(t);
+  if (ed.multi) rebuildAll();
 }
 
 function diffNode(o, v, p, t) {
@@ -506,8 +611,43 @@ function sideLines(sn, parentOut = {}) {
   ];
 }
 
+function buildMulti() {
+  const parentOut = {};
+  const sides = realSides();
+  const owners = new Map();
+  for (const sn of sides) for (const l of sideLines(sn, parentOut)) {
+    if (!owners.has(l)) owners.set(l, []);
+    if (!owners.get(l).includes(sn)) owners.get(l).push(sn);
+  }
+  const blocks = new Map();
+  for (const [l, who] of owners) {
+    const key = who.join(",");
+    if (!blocks.has(key)) blocks.set(key, { who, lines: [] });
+    blocks.get(key).lines.push(l);
+  }
+  const ordered = [...blocks.values()].sort((a, b) => b.who.length - a.who.length);
+  const heads = (who) => who.map((sn, i) => (i ? "&" : ">") + ed.sides[sn].path);
+  return [
+    ...ordered.map((b) => [heads(b.who), b.lines]),
+    ...Object.entries(parentOut).map(([path, lines]) => [[">" + path], lines]),
+  ];
+}
+
 function buildPatch() {
   const out = ["# " + ($("#target-name").textContent || tail(ed.path))];
+  if (ed.multi) {
+    let any = false;
+    for (const [heads, lines] of buildMulti()) {
+      if (!lines.length) continue;
+      if (any) out.push("");
+      any = true;
+      out.push(...heads, ...lines.map((l) => "    " + l));
+    }
+    if (!any) out.push(...ed.paths.map((p, i) => (i ? "&" : ">") + p));
+    const cond = conditionExpr();
+    if (cond) out.splice(1, 0, "$if " + cond), out.push("$endif");
+    return out.join("\n") + "\n";
+  }
   const parentOut = {};
   const itemLines = sideLines("item", parentOut);
   const storeLines = ed.sides.store ? sideLines("store", parentOut) : [];
@@ -557,7 +697,7 @@ function highlight(text) {
 }
 
 const saveDraft = debounce(() => {
-  if (ed) store.set("draft:" + ed.path, { name: ed.name, ops: ed.ops, text: ed.text, showStore: ed.showStore, cond: [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] });
+  if (ed) store.set("draft:" + (ed.multi ? "multi:" + ed.paths.join("|") : ed.path), { name: ed.name, ops: ed.ops, text: ed.text, showStore: ed.showStore, cond: [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] });
 }, 400);
 
 function renderOutput() {
@@ -831,7 +971,8 @@ function renderSide(sn) {
   addWrap.append(h("button", { class: "btn", onclick: (e) => { e.stopPropagation(); openAddMenu(sn, addWrap); } }, "+ Add field"));
   return h("div", { class: "sec", "data-side": sn },
     h("div", { class: "sec-head" },
-      h("div", {}, h("div", { class: "sec-title" }, sn === "item" ? "Item metadata" : "StoreItem metadata"), h("code", { class: "muted small" }, s.path)),
+      h("div", {}, h("div", { class: "sec-title" }, sn === "all" ? `Shared metadata of ${realSides().length} items` : sn === "item" ? "Item metadata" : "StoreItem metadata"),
+        sn === "all" ? h("div", { class: "muted small" }, "Only values that are identical in every item are shown. Changes apply to all of them.") : h("code", { class: "muted small" }, s.path)),
       addWrap),
     h("div", { class: "tree" },
       own.filter(match).map((k) => node(sn, [k], s.edit[k])),
@@ -854,13 +995,13 @@ const syncSide = debounce((sn) => {
 }, 150);
 
 function renderSides() {
+  if (ed.multi) { $("#sides").replaceChildren(renderSide("all")); return; }
   $("#sides").replaceChildren(renderSide("item"), ed.showStore && ed.sides.store ? renderSide("store") : "");
 }
-
 function renderFr() {
   $("#fr-list").replaceChildren(...ed.text.map((op, i) => h("div", { class: "chip" },
     h("code", {}, `${op.kind}|${op.from}|${op.to}`),
-    h("button", { class: "btn-x", title: "Remove", onclick: () => { ed.text.splice(i, 1); replay("item"); if (ed.sides.store) replay("store"); refresh(); } }, "×"))));
+    h("button", { class: "btn-x", title: "Remove", onclick: () => { ed.text.splice(i, 1); replayAll(); refresh(); } }, "×"))));
   if (ed.text.length) $("#fr").hidden = false;
 }
 
@@ -918,6 +1059,7 @@ function openAddMenu(sn, wrap) {
 function closeAddMenu() { $("#add-menu").hidden = true; }
 
 async function showEditor(cat, path) {
+  $("#store-opt").hidden = false;
   ed = { cat, path, group: fieldGroup(cat, path), name: "", showStore: false, sides: null, ops: [], text: [], open: new Set(), closed: new Set(), inhOpen: new Set() };
   $("#target-path").textContent = path;
   $("#store-path").textContent = "";
@@ -984,7 +1126,59 @@ async function showEditor(cat, path) {
   if (ed.sides.store) replay("store");
   refresh();
 }
-
+async function showMulti(cat, paths) {
+  ed = { cat, path: paths[0], paths, multi: true, group: fieldGroup(cat, paths[0]), name: "", showStore: false, sides: null, ops: [], text: [], open: new Set(), closed: new Set(), inhOpen: new Set() };
+  $("#target-icon").removeAttribute("src");
+  $("#target-icon").style.visibility = "hidden";
+  $("#parent-warn").hidden = true;
+  $("#store-opt").hidden = true;
+  $("#target-name").textContent = paths.length + " items";
+  $("#target-path").textContent = paths.join("  &  ");
+  $("#sides").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), "Loading metadata for " + paths.length + " items…"));
+  $("#fr").hidden = true;
+  $("#fr-list").replaceChildren();
+  $("#key-filter").value = "";
+  $("#output").innerHTML = "";
+  $("#cond-on").checked = false;
+  $("#cond-mode").value = "from";
+  $("#cond-ver").value = "";
+  syncCond();
+  const draft = store.get("draft:multi:" + paths.join("|"));
+  let types;
+  try {
+    await Promise.all([loadFields(), loadDict().catch(() => null)]);
+    types = await Promise.all(paths.map(async (p) => absolutize(await loadType(p), p)));
+  } catch (e) {
+    $("#sides").replaceChildren(h("div", { class: "empty" }, "Could not load metadata: " + e.message));
+    return;
+  }
+  if (!ed || ed.paths !== paths) return;
+  const missing = paths.filter((p, i) => !types[i]);
+  if (missing.length) toast("Not found in bin-data: " + missing.map(tail).join(", "));
+  ed.sides = {};
+  paths.forEach((p, i) => {
+    const t = types[i];
+    ed.sides["m" + i] = { path: p, own: t?.own || {}, eff: t?.data || {}, origin: t?.origin || {}, ownKeys: Object.keys(t?.own || {}) };
+  });
+  ed.sides.all = { path: "", origin: {}, ownKeys: [] };
+  let names = paths.map(tail);
+  try {
+    const lists = await Promise.all(Object.keys(CATS).map((c) => loadList(c).catch(() => [])));
+    const byPath = new Map(lists.flat().map((i) => [i.path, i.name]));
+    names = paths.map((p) => byPath.get(p) || tail(p));
+  } catch {}
+  $("#target-name").textContent = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
+  ed.name = draft?.name ?? names.join(", ");
+  $("#patch-name").value = ed.name;
+  if (draft) {
+    ed.ops = (draft.ops || []).filter((o) => ed.sides[o.side]);
+    ed.text = draft.text || [];
+    [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] = draft.cond?.length === 3 ? draft.cond : [false, "from", ""];
+    syncCond();
+  }
+  replayAll();
+  refresh();
+}
 function syncCond() {
   const on = $("#cond-on").checked;
   $("#cond-opts").hidden = !on;
@@ -1013,7 +1207,7 @@ function initEditor() {
   $("#cond-mode").addEventListener("change", () => { syncCond(); renderOutput(); });
   $("#cond-on").addEventListener("change", () => { syncCond(); renderOutput(); });
   $("#cond-ver").addEventListener("input", renderOutput);
-  $("#also-store").addEventListener("change", (e) => { ed.showStore = e.target.checked && !!ed.sides?.store; renderSides(); saveDraft(); });
+  $("#also-store").addEventListener("change", (e) => { if (ed.multi) return; ed.showStore = e.target.checked && !!ed.sides?.store; renderSides(); saveDraft(); });
   $("#key-filter").addEventListener("input", debounce(() => { if (!ed?.sides) return; ed.closed.clear(); renderSides(); }, 120));
   $("#btn-fr").onclick = () => { $("#fr").hidden = !$("#fr").hidden; if (!$("#fr").hidden) $("#fr-from").focus(); };
   $("#fr-add").onclick = () => {
@@ -1068,17 +1262,11 @@ function initBlank() {
   form.onsubmit = async (e) => {
     e.preventDefault();
     const typed = input.value.trim();
-    const path = byName.get(typed.toLowerCase()) || normalizePath(typed);
-    if (!path) return;
-    status.innerHTML = '<span class="spinner"></span>Looking up ' + esc(path) + "…";
-    try {
-      await getJSON(BIN + path + ".json");
-    } catch {
-      status.textContent = path + " was not found in warframe-packages-bin-data. Check the spelling and capitals.";
-      return;
-    }
+    const parts = byName.has(typed.toLowerCase()) ? [typed] : typed.split(/[\s,&]+/).filter(Boolean);
+    const paths = [...new Set(parts.map((x) => byName.get(x.toLowerCase()) || normalizePath(x)).filter(Boolean))];
+    if (!paths.length) return;
     status.innerHTML = hint;
-    location.hash = "#/edit?c=" + catOfPath(path) + "&p=" + encodeURIComponent(path);
+    location.hash = "#/edit?c=" + catOfPath(paths[0]) + paths.map((p) => "&p=" + encodeURIComponent(p)).join("");
   };
 }
 function braceDepth(str) {
@@ -1416,11 +1604,13 @@ function route() {
     showPicker(hash.split("/")[2]);
   } else if (hash.startsWith("#/edit")) {
     const q = new URLSearchParams(hash.split("?")[1] || "");
-    const p = q.get("p");
-    if (!p || !p.startsWith("/Lotus/")) { location.hash = "#/pick/weapon"; return; }
+    const ps = q.getAll("p").filter((x) => x.startsWith("/Lotus/"));
+    const p = ps[0];
+    if (!p) { location.hash = "#/pick/weapon"; return; }
     show("view-edit");
     window.scrollTo(0, 0);
-    showEditor(CATS[q.get("c")] ? q.get("c") : catOfPath(p), p);
+    if (ps.length > 1) showMulti(CATS[q.get("c")] ? q.get("c") : catOfPath(p), [...new Set(ps)]);
+    else showEditor(CATS[q.get("c")] ? q.get("c") : catOfPath(p), p);
   } else {
     show("view-home");
   }
@@ -1428,6 +1618,7 @@ function route() {
 initHome();
 initEditor();
 initBlank();
+initMulti();
 initCheck();
 $("#cats").addEventListener("click", (e) => { if (e.target.dataset.cat) location.hash = "#/pick/" + e.target.dataset.cat; });
 $("#search").addEventListener("input", debounce(filterPicker, 120));
