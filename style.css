@@ -94,8 +94,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .mod-flag { cursor: help; }
 .mod-flag img, .card .mod-flag img { display: block; width: 20px; height: 20px; object-fit: contain; }
 .mod-flag .tip-box { text-align: left; font-weight: 400; }
-.pick-legend { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 14px; }
-.pick-legend .sep { color: var(--faint); }
+.pick-legend { display: flex; align-items: center; gap: 20px; color: var(--dim); font-size: 14px; }
 .legend-item { display: flex; align-items: center; gap: 8px; }
 .legend-item .mod-flag { flex: none; width: 20px; }
 #view-edit { display: flex; flex-direction: column; min-height: 100vh; }
@@ -104,6 +103,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 #patch-name { max-width: 420px; }
 .target { display: flex; gap: 14px; align-items: flex-start; margin-top: 18px; padding: 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
 .target img { width: 56px; height: 56px; object-fit: contain; flex: none; }
+.target strong { display: block; font-size: 16px; font-weight: 500; }
 .target code { color: var(--dim); overflow-wrap: anywhere; }
 .opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; margin-top: 8px; }
 .cond, #cond-opts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -118,15 +118,13 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .pane-head .tools, .file-btn { text-transform: none; letter-spacing: 0; }
 .tools { display: flex; gap: 6px; align-items: center; }
 .tools .input { width: 160px; }
-.output { margin: 0; padding: 14px; min-height: 220px; max-height: calc(100vh - 220px); overflow: auto; white-space: pre; }
+.output { margin: 0; padding: 14px; min-height: 220px; max-height: calc(100vh - 220px); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .output .c { color: var(--faint); }
 .output .h { color: #fff; font-weight: 500; }
 .output .o { color: var(--dim); }
 .edit-foot { position: sticky; bottom: 0; margin-top: auto; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 24px; border-top: 1px solid var(--line); background: rgba(0,0,0,.9); backdrop-filter: blur(8px); }
 
-.intro { margin: 0; padding: 12px 14px; color: var(--dim); font-size: 13.5px; border-bottom: 1px solid var(--line); }
-.intro strong { color: var(--fg); font-weight: 500; }
-.dot, .node.mod > .line > .k .nm::before { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--fg); vertical-align: 2px; }
+.node.mod > .line > .k .nm::before { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--fg); vertical-align: 2px; }
 .fr { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
 .fr-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .fr-row .input { flex: 1 1 140px; width: auto; }
@@ -156,8 +154,9 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .node .k.click, .node .sum { cursor: pointer; }
 .node .sum { font: 12.5px var(--mono); color: var(--faint); }
 .node .w { display: block; min-width: 0; }
-.node .acts { display: flex; opacity: .7; transition: opacity .15s; }
-.node .line:hover .acts, .node.mod > .line .acts { opacity: 1; }
+.node .acts { display: flex; opacity: 0; transition: opacity .15s; }
+.node .line:hover .acts, .node .line:focus-within .acts { opacity: 1; }
+@media (hover: none) { .node .acts { opacity: 1; } }
 .removed .k { text-decoration: line-through; color: var(--faint); }
 .tw { background: none; border: 0; color: var(--dim); cursor: pointer; padding: 0; font-size: 14px; width: 18px; }
 .tw:hover { color: var(--fg); }
@@ -223,6 +222,8 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .eye-field { display: flex; flex-direction: column; }
 .eye-note { align-self: end; padding-bottom: 6px; }
 .eye-panel p { margin: 0; }
+.eye-more summary { cursor: pointer; color: var(--dim); font-size: 14px; }
+.eye-more[open] summary { margin-bottom: 10px; }
 @media (max-width: 900px) {
   .choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .eye-grid { grid-template-columns: 1fr; }

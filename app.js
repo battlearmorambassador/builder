@@ -164,6 +164,16 @@ function eeInline(v) {
   if (typeof v === "number") return String(v);
   return eeStr(String(v));
 }
+const indent = (l) => l.replace(/^/gm, "    ");
+function eeValue(v) {
+  if (typeof v === "string" && /[|<]/.test(v)) return '"' + v.replace(/"/g, "'") + '"';
+  if (!isObj(v)) return eeInline(v);
+  const items = Array.isArray(v) ? v : Object.entries(v);
+  if (!items.length) return "{}";
+  if (Array.isArray(v) && !v.some(isObj)) return eeInline(v);
+  const lines = Array.isArray(v) ? v.map(eeValue) : items.map(([k, x]) => k + "=" + eeValue(x));
+  return "{\n" + lines.map(indent).join(Array.isArray(v) ? ",\n" : "\n") + "\n}";
+}
 function eeStr(s) {
   if (s === "") return '""';
   if (/[,{}="\n]/.test(s) || s !== s.trim()) return '"' + s.replace(/"/g, "'") + '"';
@@ -288,7 +298,6 @@ function drawLegend(cat) {
   el.hidden = cat !== "upgrade";
   if (el.hidden || el.childElementCount) return;
   Object.keys(MOD_FLAGS).forEach((k, i) => {
-    if (i) el.append(h("span", { class: "sep" }, "·"));
     const icon = h("span", { class: "mod-flag " + k });
     icon.innerHTML = MOD_FLAGS[k].svg;
     el.append(h("span", { class: "legend-item" }, icon, MOD_FLAGS[k].label));
@@ -434,6 +443,7 @@ function applyOp(e, op) {
   if (op.t === "set" || op.t === "addKey") par[k] = clone(op.v);
   else if (op.t === "del") { if (Array.isArray(par)) par.splice(+k, 1); else delete par[k]; }
   else if (op.t === "push" && Array.isArray(par[k])) par[k].push(clone(op.v));
+  else if (op.t === "dup" && Array.isArray(par) && +k < par.length) par.splice(+k + 1, 0, clone(par[k]));
 }
 function replay(sn) {
   const s = ed.sides[sn];
@@ -521,7 +531,7 @@ function recordAll(op) {
     const r = ed.sides[sn];
     const storeSide = sn.startsWith("s");
     if (storeSide && op.t === "addKey") continue;
-    let path = op.t === "addKey" || op.path.length === 1 ? op.path : matchPath(all.edit, r.edit, op.path, op.t === "del");
+    let path = op.t === "addKey" || op.path.length === 1 ? op.path : matchPath(all.edit, r.edit, op.path, op.t === "del" || op.t === "dup");
     if (!path) continue;
     if (storeSide && !hasAt(r.edit, path)) continue;
     if (storeSide && op.t === "set" && isObj(getAt(r.edit, path)) !== isObj(op.v)) continue;
@@ -551,12 +561,12 @@ function record(sn, op) {
   const o = ed.sides[other];
   if (o && op.t !== "addKey") {
     const here = ed.sides[sn].edit;
-    const mp = matchPath(here, o.edit, op.path, op.t === "del");
+    const mp = matchPath(here, o.edit, op.path, op.t === "del" || op.t === "dup");
     if (mp) {
       const there = getAt(o.edit, mp);
       if (op.t === "set" && hasAt(o.edit, mp) && !isObj(there)) targets.push([other, mp]);
       if (op.t === "push" && Array.isArray(there)) targets.push([other, mp]);
-      if (op.t === "del" && hasAt(o.edit, mp)) targets.push([other, mp]);
+      if ((op.t === "del" || op.t === "dup") && hasAt(o.edit, mp)) targets.push([other, mp]);
     }
   }
   for (const [side, path] of targets) pushOp({ ...op, side, path });
@@ -603,7 +613,7 @@ function sideLines(sn, parentOut = {}) {
     if (ed.eye) return false;
     const src = s.origin[k];
     if (s.ownKeys.includes(k) || !(k in base) || !isBaseType(src)) return false;
-    const line = k + "=" + eeInline(edit[k]);
+    const line = k + "=" + eeValue(edit[k]);
     const list = (parentOut[src] ||= []);
     if (!list.includes(line)) list.push(line);
     return true;
@@ -611,7 +621,7 @@ function sideLines(sn, parentOut = {}) {
   if (s.ownKeys.some((k) => !(k in edit))) {
     for (const k of Object.keys(edit)) {
       if (!s.ownKeys.includes(k) && deepEq(base[k], edit[k])) continue;
-      if (!toParent(k)) pre.push(k + "=" + eeInline(edit[k]));
+      if (!toParent(k)) pre.push(k + "=" + eeValue(edit[k]));
     }
     return ["$clear", ...pre];
   }
@@ -620,10 +630,10 @@ function sideLines(sn, parentOut = {}) {
     const o = base[k], v = edit[k];
     if (k in base && deepEq(o, v)) continue;
     if (toParent(k)) continue;
-    if (!s.ownKeys.includes(k) || !(k in base) || !isObj(o) || !isObj(v) || removals.has(k)) { pre.push(k + "=" + eeInline(v)); continue; }
+    if (!s.ownKeys.includes(k) || !(k in base) || !isObj(o) || !isObj(v) || removals.has(k)) { pre.push(k + "=" + eeValue(v)); continue; }
     const t = { q: [], a: [] };
-    if (diffNode(o, v, k, t)) { q.push(...t.q); a.push(...t.a); }
-    else pre.push(k + "=" + eeInline(v));
+    if (diffNode(o, v, k, t) && !t.a.some(([, x]) => isObj(x))) { q.push(...t.q); a.push(...t.a); }
+    else pre.push(k + "=" + eeValue(v));
   }
   const raw = JSON.stringify(s.ownKeys.map((k) => base[k]));
   const groups = new Map();
@@ -675,13 +685,14 @@ function buildEye() {
   const out = ["# " + (ed.name || tail(ed.path))];
   const lines = sideLines("item");
   const inner = [];
-  const block = (heads, body) => { if (inner.length) inner.push(""); inner.push(...heads, ...body.map((l) => "    " + l)); };
+  const block = (heads, body) => { if (inner.length) inner.push(""); inner.push(...heads, ...body.map(indent)); };
   if (e.mode === "new") block(["+" + ed.path + "|" + e.base], lines);
   if (!e.hasStore) {
     const body = [];
     if (st.category && !st.parent.startsWith("/Lotus/StoreItems/")) body.push("ProductCategory=" + st.category);
-    if (st.name.trim()) body.push("LocalizeTag=" + eeStr(st.name.trim()));
-    if (st.desc.trim()) body.push("LocalizeDescTag=" + eeStr(st.desc.trim()));
+    const name = st.name.trim() || itemText("LocalizeTag"), desc = st.desc.trim() || itemText("LocalizeDescTag");
+    if (name) body.push("LocalizeTag=" + eeStr(name));
+    if (desc) body.push("LocalizeDescTag=" + eeStr(desc));
     if (st.icon.trim()) body.push("Icon=" + st.icon.trim());
     body.push("TypeName=" + ed.path);
     block(["+" + st.path + "|" + st.parent], body);
@@ -689,7 +700,7 @@ function buildEye() {
   if (e.manifest) block([">" + MANIFEST], ["a|StoreItems|" + st.path]);
   const gated = inner.length && conditionExpr() !== "can_add_new_types()";
   out.push(...(gated ? ["$if can_add_new_types()", ...inner, "$endif"] : inner));
-  if (e.mode === "asis" && lines.length) out.push("", ">" + ed.path, ...lines.map((l) => "    " + l));
+  if (e.mode === "asis" && lines.length) out.push("", ">" + ed.path, ...lines.map(indent));
   return finish(out);
 }
 function finish(out) {
@@ -703,7 +714,7 @@ function emitBlocks(out, blocks) {
     if (!lines.length) continue;
     if (any) out.push("");
     any = true;
-    out.push(...heads, ...lines.map((l) => "    " + l));
+    out.push(...heads, ...lines.map(indent));
   }
   return any;
 }
@@ -922,7 +933,7 @@ function statText(v, st) {
     return (x >= 0 ? "+" : "") + fmtNum(x) + (st.pct ? "%" : "");
   };
   if (!st.additive) return `In game: ${/^SET/.test(st.op) ? fmtNum(v) : f(0)} (${enumLabel(st.op).toLowerCase()})`;
-  return st.max != null ? `In game: ${f(0)} at rank 0 · ${f(st.max)} at rank ${st.max} (max)` : `In game: ${f(0)} per rank`;
+  return st.max != null ? `In game: ${f(0)} at rank 0, ${f(st.max)} at rank ${st.max} (max)` : `In game: ${f(0)} per rank`;
 }
 
 function statSelect(vals, v) {
@@ -951,6 +962,7 @@ function node(sn, path, v, flt = treeFilter) {
   const n = h("div", { class: "node" + (changed ? " mod" : "") + (top ? " top" : "") });
   const inherited = top && exists && !s.ownKeys.includes(k);
   const acts = h("span", { class: "acts" },
+    inArr && isObj(v) ? h("button", { class: "btn-x", title: "Duplicate", onclick: () => { record(sn, { t: "dup", path }); refresh(); } }, "⧉") : null,
     top && changed && exists ? h("button", { class: "btn-x", title: "Reset to original", onclick: () => resetKey(sn, k) }, "↺︎") : null,
     inherited && !isObj(v) ? null : h("button", {
       class: "btn-x", title: inherited ? "Empty this inherited value" : inArr ? "Remove item" : "Remove",
@@ -975,7 +987,7 @@ function node(sn, path, v, flt = treeFilter) {
     n.append(h("div", { class: "line" },
       h("button", { class: "tw", onclick: toggle }, open ? "▾" : "▸"),
       Object.assign(label, { onclick: toggle, className: "k click" }),
-      h("span", { class: "sum", onclick: toggle }, (arr ? "list · " : "object · ") + count + (arr ? (count === 1 ? " item" : " items") : count === 1 ? " field" : " fields")),
+      h("span", { class: "sum", onclick: toggle }, count + (arr ? (count === 1 ? " item" : " items") : count === 1 ? " field" : " fields")),
       acts));
     if (open) {
       const kids = h("div", { class: "kids" }, Object.entries(v).filter(show).map(([kk, x]) => node(sn, [...path, kk], x, sub)));
@@ -993,7 +1005,7 @@ function keyLabel(path, k, inArr, v) {
   const el = h("span", { class: "k", title: path.join(".") });
   if (inArr) {
     const what = isObj(v) ? (v.UpgradeType ? statName(String(v.UpgradeType)) : v.ItemType ? tail(String(v.ItemType)) : null) : null;
-    el.append(h("span", { class: "nm" }, "#" + (+k + 1) + (what ? " · " + what : "")));
+    el.append(h("span", { class: "nm" }, "#" + (+k + 1) + (what ? " " + what : "")));
     return el;
   }
   el.append(h("span", { class: "nm" }, labelOf(k)));
@@ -1016,7 +1028,8 @@ function renderSide(sn) {
   const filter = (treeFilter = $("#key-filter").value.trim().toLowerCase());
   const match = (k) => !filter || deepHit(k, s.edit[k]);
   const keys = Object.keys(s.edit).filter((k) => !HIDDEN(k));
-  const own = keys.filter((k) => s.ownKeys.includes(k) || !(k in s.base));
+  const pinned = (k) => ed.eye?.mode === "new" && sn === "item" && (k === "LocalizeTag" || k === "LocalizeDescTag");
+  const own = keys.filter((k) => s.ownKeys.includes(k) || !(k in s.base) || pinned(k)).sort((a, b) => pinned(b) - pinned(a));
   const inherited = keys.filter((k) => !own.includes(k));
   const removed = s.ownKeys.filter((k) => !(k in s.edit));
   const removedInh = Object.keys(s.base).filter((k) => !s.ownKeys.includes(k) && !(k in s.edit) && !HIDDEN(k));
@@ -1027,8 +1040,8 @@ function renderSide(sn) {
   addWrap.append(h("button", { class: "btn", onclick: (e) => { e.stopPropagation(); openAddMenu(sn, addWrap); } }, "+ Add field"));
   return h("div", { class: "sec", "data-side": sn },
     h("div", { class: "sec-head" },
-      h("div", {}, h("div", { class: "sec-title" }, sn === "all" ? `Shared metadata of ${realSides().length} items` : sn === "item" ? "Item metadata" : "StoreItem metadata"),
-        sn === "all" ? h("div", { class: "muted small" }, "Only values that are identical in every item are shown. Changes apply to all of them, and to their StoreItems wherever the same value exists.") : h("code", { class: "muted small" }, s.path)),
+      h("div", {}, h("div", { class: "sec-title" }, sn === "all" ? `Shared metadata of ${realSides().length} items` : sn === "item" ? "Item" : "StoreItem"),
+        sn === "all" ? h("div", { class: "muted small" }, "Only values that are identical in every item are shown. Changes apply to all of them, and to their StoreItems wherever the same value exists.") : sn === "store" ? h("code", { class: "muted small" }, s.path) : null),
       addWrap),
     h("div", { class: "tree" },
       own.filter(match).map((k) => node(sn, [k], s.edit[k])),
@@ -1040,7 +1053,7 @@ function renderSide(sn) {
       const shown = ks.filter(match);
       if (filter && !shown.length && !gone.length) return null;
       return h("details", { class: "inh", open: filter ? true : ed.inhOpen.has(gid), ontoggle: (e) => { if (!filter) e.target.open ? ed.inhOpen.add(gid) : ed.inhOpen.delete(gid); } },
-        h("summary", {}, h("span", {}, `Inherited from ${tail(src || "parent type")} (${ks.length})`), isBaseType(src) ? warnTip(`You also need to edit this parent type (${tail(src)}) for some changes to take effect.`) : null),
+        h("summary", {}, h("span", {}, `${ed.eye?.mode === "new" ? "Copied" : "Inherited"} from ${tail(src || "parent type")} (${ks.length})`), isBaseType(src) ? warnTip(`You also need to edit this parent type (${tail(src)}) for some changes to take effect.`) : null),
         h("div", { class: "tree" }, shown.map((k) => node(sn, [k], s.edit[k])), gone.map(removedRow)));
     }),
     !keys.length && !removed.length ? h("div", { class: "empty" }, "No metadata found for this type.") : null);
@@ -1069,20 +1082,24 @@ function addOptions() {
   const missing = (k) => !(k in s.edit);
   const common = (addSide === "store" ? [] : COMMON[ed.group] || []).filter((k) => k in fields && missing(k));
   const known = Object.keys(fields).filter((k) => missing(k) && !common.includes(k) && !HIDDEN(k));
-  return [["Common", common], ["Known fields", known.sort((a, b) => labelOf(a).localeCompare(labelOf(b)))]];
+  const set = Object.keys(s.edit).filter((k) => !HIDDEN(k));
+  return [["Common", common], ["Known fields", known.sort((a, b) => labelOf(a).localeCompare(labelOf(b)))], ["Already set", set]];
 }
 function drawAddMenu() {
   const q = addSearch.value.trim();
   const ql = q.toLowerCase();
   addList.replaceChildren();
-  let n = 0;
+  let n = 0, exact = false;
   for (const [grp, keys] of addOptions()) {
+    const isSet = grp === "Already set";
+    if (isSet && !ql) continue;
     const f = keys.filter((k) => !ql || (labelOf(k) + " " + k).toLowerCase().includes(ql));
     if (!f.length) continue;
+    if (f.some((k) => k.toLowerCase() === ql || labelOf(k).toLowerCase() === ql)) exact = true;
     addList.append(h("div", { class: "grp" }, grp));
-    for (const k of f.slice(0, 400)) addList.append(h("button", { class: n++ === 0 ? "sel" : "", onclick: () => pickField(k) }, h("span", {}, labelOf(k))));
+    for (const k of f.slice(0, 400)) addList.append(h("button", { class: n++ === 0 ? "sel" : "", onclick: () => (isSet ? jumpToField(k) : pickField(k)) }, h("span", {}, labelOf(k)), isSet ? h("span", {}, "go to field") : null));
   }
-  if (q && /^[A-Za-z_][\w:]*$/.test(q) && !(q in ed.sides[addSide].edit)) {
+  if (q && !exact && /^[A-Za-z_][\w:]*$/.test(q)) {
     addList.append(h("div", { class: "grp" }, "Custom"), h("button", { class: n ? "" : "sel", onclick: () => pickField(q) }, h("span", {}, labelOf(q)), h("span", {}, "new field")));
   }
 }
@@ -1093,6 +1110,17 @@ function pickField(k) {
   record(addSide, { t: "addKey", path: [k], v: defaultFor(FIELDS[g]?.[k]) });
   ed.open.add(addSide + "|" + k);
   refresh();
+  focusField(k);
+}
+function jumpToField(k) {
+  closeAddMenu();
+  const s = ed.sides[addSide];
+  if (!s.ownKeys.includes(k) && k in s.base) ed.inhOpen.add(addSide + "|" + s.origin[k]);
+  $("#key-filter").value = "";
+  renderSides();
+  focusField(k);
+}
+function focusField(k) {
   const el = [...document.querySelectorAll("#sides .node.top .k")].find((x) => x.title === k);
   el?.scrollIntoView({ block: "center" });
   el?.closest(".node")?.querySelector("input,select")?.focus();
@@ -1218,21 +1246,28 @@ function eyeField(label, value, onInput, opts = {}) {
   input.addEventListener(opts.options ? "change" : "input", () => { onInput(input.value); renderOutput(); });
   return h("label", { class: "eye-field" }, h("span", { class: "label" }, label), input);
 }
-
+function itemText(key) {
+  const s = ed.sides.item, v = s.edit?.[key];
+  return typeof v === "string" && !deepEq(v, s.eff[key]) ? v : "";
+}
 function drawEyePanel() {
   const e = ed.eye, st = e.store, el = $("#eye-panel");
   el.hidden = false;
   const cats = [...new Set(["", st.category, ...(FIELDS.store?.ProductCategory?.enum || [])])];
+  const isNew = e.mode === "new";
+  const same = (what) => (isNew ? "Same as the item " + what : "Plain text or /Lotus/Language/… key");
   el.replaceChildren(
+    isNew ? h("p", { class: "muted small" }, "Only ", h("code", {}, tail(ed.path)), " is created and edited. ", h("code", {}, tail(e.base)), " stays as it is.") : null,
     e.hasStore
-      ? h("p", { class: "muted small" }, "This item already has a StoreItem (" + st.path + "), so only the store entry is added.")
-      : h("div", { class: "eye-grid" },
-          eyeField("StoreItem path", st.path, (v) => (st.path = v.trim())),
-          eyeField("Parent StoreItem type", st.parent, (v) => (st.parent = v.trim())),
-          st.parent.startsWith("/Lotus/StoreItems/") ? h("span", { class: "muted small eye-note" }, "Category and other store details are inherited from the parent StoreItem.") : eyeField("Category", st.category, (v) => (st.category = v), { options: cats }),
-          eyeField("Name", st.name, (v) => (st.name = v), { placeholder: "Plain text or /Lotus/Language/… key" }),
-          eyeField("Description", st.desc, (v) => (st.desc = v), { placeholder: "Plain text or /Lotus/Language/… key" }),
-          eyeField("Icon", st.icon, (v) => (st.icon = v), { placeholder: "/Lotus/Interface/Icons/…" })),
+      ? h("p", { class: "muted small" }, "This item already has a StoreItem, so only the store entry is added.")
+      : h("details", { class: "eye-more" }, h("summary", {}, "StoreItem settings"),
+          h("div", { class: "eye-grid" },
+            eyeField("StoreItem path", st.path, (v) => (st.path = v.trim())),
+            eyeField("Parent StoreItem type", st.parent, (v) => (st.parent = v.trim())),
+            st.parent.startsWith("/Lotus/StoreItems/") ? h("span", { class: "muted small eye-note" }, "Category is inherited from the parent StoreItem.") : eyeField("Category", st.category, (v) => (st.category = v), { options: cats }),
+            eyeField("Store name", st.name, (v) => (st.name = v), { placeholder: same("name") }),
+            eyeField("Store description", st.desc, (v) => (st.desc = v), { placeholder: same("description") }),
+            eyeField("Store icon", st.icon, (v) => (st.icon = v), { placeholder: "/Lotus/Interface/Icons/…" }))),
     h("label", { class: "check" }, Object.assign(h("input", { type: "checkbox", checked: e.manifest }), { onchange: (ev) => { e.manifest = ev.target.checked; renderOutput(); } }), h("span", {}, "Add it to the in-game store")));
 }
 async function showMulti(cat, paths) {
@@ -1525,6 +1560,8 @@ function parsePatchText(text) {
     } else if (t && !t.startsWith("#")) {
       if (!inScope(ln, false)) return;
       if (patch.depth > 0) {
+        if (t.startsWith("{") && patch.prevVal?.endsWith("}")) add(ln, "error", "A comma is missing after the <code>}</code> on the line above. List entries must be separated by <code>},</code> or the game can softlock.");
+        patch.prevVal = t;
         patch.depth += braceDepth(t);
         if (patch.depth < 0) add(ln, "error", "There are more } than {.");
         return;
