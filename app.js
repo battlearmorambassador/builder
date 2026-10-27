@@ -150,13 +150,13 @@ function getJSON(url) {
 
 let DICT = null;
 const loadDict = () => getJSON(PEP + "/dict.en.json").then((d) => (DICT = d));
-let FIELDS = null;
+const FIELDS = window.FIELDS_DATA || {};
 const VERSIONS = window.VERSIONS_DATA || [];
-const loadFields = () => Promise.resolve((FIELDS = window.FIELDS_DATA || {}));
-
 const loc = (k) => (DICT && k && DICT[k]) || null;
 const tail = (p) => p.split("/").pop();
 const toStorePath = (p) => p.replace(/^\/Lotus\//, "/Lotus/StoreItems/");
+const cleanName = (key, path) => (loc(key) || tail(path)).replace(/<[^>]+>\s*/g, "");
+const hideBroken = (e) => (e.target.style.visibility = "hidden");
 
 function eeInline(v) {
   if (Array.isArray(v)) return "{" + v.map(eeInline).join(",") + "}";
@@ -226,15 +226,15 @@ async function loadList(cat) {
       let sub;
       if (cat === "upgrade") sub = expName === "ExportArcanes" || path.includes("/CosmeticEnhancers/") ? "Arcanes" : "Mods";
       else sub = def.sub[e.productCategory] || "Other";
-      const name = (loc(e.name) || tail(path)).replace(/<[^>]+>\s*/g, "");
-      const flag = e.isFrivolous && !NOT_IMPOSTOR.has(path) ? "impostor" : e.isStarter ? "flawed" : null;
+      const name = cleanName(e.name, path);
+      const flag = e.isFrivolous ? "impostor" : e.isStarter ? "flawed" : null;
       items.push({ path, name, icon: e.icon, sub, cat, raw: e, flag, search: (name + " " + path + " " + (flag || "")).toLowerCase() });
     }
   });
   items.sort((a, b) => a.name.localeCompare(b.name));
   return (listCache[cat] = items);
 }
-
+const loadAllLists = () => Promise.all(Object.keys(CATS).map((c) => loadList(c).catch(() => []))).then((l) => l.flat());
 function fieldGroup(cat, path) {
   if (path.startsWith("/Lotus/StoreItems/")) return "store";
   if (cat === "upgrade") return path.includes("/CosmeticEnhancers/") ? "arcane" : "mod";
@@ -251,19 +251,18 @@ function catOfPath(p) {
 
 const CHOICES = [
   { cat: "suit", name: "Suit", sub: "Warframes, Archwings, Necramechs, companions", icon: "/Lotus/Interface/Icons/StoreIcons/Warframes/Excalibur.png" },
-  { cat: "weapon", name: "Weapon", sub: "Primary, secondary, melee, arch-guns…", icon: "/Lotus/Interface/Icons/StoreIcons/Weapons/MeleeWeapons/Weapons/Nikana.png" },
+  { cat: "weapon", name: "Weapon", sub: "Primary, secondary, melee...", icon: "/Lotus/Interface/Icons/StoreIcons/Weapons/MeleeWeapons/Weapons/Nikana.png" },
   { cat: "upgrade", name: "Mods / Arcanes", sub: "Mods and Arcanes", icon: "/Lotus/Interface/Cards/Images/AvatarMods/AbilityDurationMod.png" },
+  { href: "#/eye", name: "Sentient Builder", sub: "Add unobtainable or custom items", icon: "/Lotus/Interface/Graphics/AntiqueMods/SentientBackFrame.png" },
 ];
 
 function initHome() {
   $("#btn-start").onclick = () => (location.hash = "#/pick");
   $("#btn-check").onclick = () => (location.hash = "#/check");
-  $("#choose").replaceChildren(...CHOICES.map((c) => h("a", { class: "choice", href: "#/pick/" + c.cat },
-    c.icon ? h("img", { src: IMG + c.icon, alt: "", onerror: (e) => (e.target.style.visibility = "hidden") }) : null,
+  $("#choose").replaceChildren(...CHOICES.map((c) => h("a", { class: "choice", href: c.href || "#/pick/" + c.cat },
+    c.icon ? h("img", { src: IMG + c.icon, alt: "", onerror: hideBroken }) : null,
     h("span", { class: "nm" }, c.name), c.sub ? h("span", { class: "muted small" }, c.sub) : null)));
 }
-const NOT_IMPOSTOR = new Set(["/Lotus/Powersuits/Banshee/SonarPvPAugmentCard"]);
-
 const MOD_FLAGS = {
   impostor: {
     label: "Impostor",
@@ -295,7 +294,7 @@ function drawLegend(cat) {
     el.append(h("span", { class: "legend-item" }, icon, MOD_FLAGS[k].label));
   });
 }
-const pick = { cat: null, sub: null, items: [], shown: 0, filtered: [], multi: false, chosen: new Map() };
+const pick = { cat: null, sub: null, items: [], shown: 0, filtered: [], multi: false, chosen: new Set() };
 function drawChosen() {
   const n = pick.chosen.size;
   $("#multi-bar").hidden = !pick.multi;
@@ -319,7 +318,7 @@ function initMulti() {
   };
   $("#multi-open").onclick = () => {
     if (pick.chosen.size < 2) return;
-    location.hash = "#/edit?c=" + pick.cat + [...pick.chosen.keys()].map((p) => "&p=" + encodeURIComponent(p)).join("");
+    location.hash = "#/edit?c=" + pick.cat + [...pick.chosen].map((p) => "&p=" + encodeURIComponent(p)).join("");
   };
 }
 const PAGE = 180;
@@ -377,11 +376,11 @@ function morePicker() {
   grid.append(...next.map((it) =>
     h("button", { class: "card" + (pick.chosen.has(it.path) ? " picked" : ""), "data-path": it.path, onclick: (e) => {
       if (!pick.multi) { location.hash = "#/edit?c=" + it.cat + "&p=" + encodeURIComponent(it.path); return; }
-      pick.chosen.has(it.path) ? pick.chosen.delete(it.path) : pick.chosen.set(it.path, it.name);
+      pick.chosen.has(it.path) ? pick.chosen.delete(it.path) : pick.chosen.add(it.path);
       e.currentTarget.classList.toggle("picked", pick.chosen.has(it.path));
       drawChosen();
     } },
-      it.icon ? h("img", { src: IMG + it.icon, loading: "lazy", alt: "", onerror: (e) => (e.target.style.visibility = "hidden") }) : h("img", { alt: "" }),
+      it.icon ? h("img", { src: IMG + it.icon, loading: "lazy", alt: "", onerror: hideBroken }) : h("img", { alt: "" }),
       h("span", { class: "nm" }, it.name),
       it.flag ? modBadge(it.flag) : null,
     )));
@@ -475,6 +474,15 @@ function matchPath(here, there, path, exactLast) {
 class Mixed {}
 
 const realSides = () => Object.keys(ed.sides).filter((k) => k !== "all" && ed.sides[k]);
+const makeSide = (path, t) => ({ path, own: t?.own || {}, eff: t?.data || {}, origin: t?.origin || {}, ownKeys: Object.keys(t?.own || {}) });
+
+function pushOp(rec) {
+  let last = null;
+  for (let i = ed.ops.length - 1; i >= 0; i--) if (ed.ops[i].side === rec.side) { last = ed.ops[i]; break; }
+  if (rec.t === "set" && last && last.t === "set" && last.path.join(".") === rec.path.join(".")) last.v = clone(rec.v);
+  else ed.ops.push(rec);
+  applyOp(ed.sides[rec.side].edit, rec);
+}
 
 function merge(vals) {
   if (vals.every((x) => deepEq(x, vals[0]))) return clone(vals[0]);
@@ -530,12 +538,7 @@ function recordAll(op) {
       const shownArr = getAt(all.edit, op.path);
       if (Array.isArray(shownArr) && shownArr.length && arr.length && deepEq(o.v, shownArr[shownArr.length - 1])) o = { ...o, v: clone(arr[arr.length - 1]) };
     }
-    const rec = { ...o, side: sn };
-    let last = null;
-    for (let i = ed.ops.length - 1; i >= 0; i--) if (ed.ops[i].side === sn) { last = ed.ops[i]; break; }
-    if (rec.t === "set" && last && last.t === "set" && last.path.join(".") === path.join(".")) last.v = clone(rec.v);
-    else ed.ops.push(rec);
-    applyOp(r.edit, rec);
+    pushOp({ ...o, side: sn });
   }
   rebuildAll();
   return ["all"];
@@ -556,14 +559,7 @@ function record(sn, op) {
       if (op.t === "del" && hasAt(o.edit, mp)) targets.push([other, mp]);
     }
   }
-  for (const [side, path] of targets) {
-    const rec = { ...op, side, path };
-    let last = null;
-    for (let i = ed.ops.length - 1; i >= 0; i--) if (ed.ops[i].side === side) { last = ed.ops[i]; break; }
-    if (op.t === "set" && last && last.t === "set" && last.path.join(".") === path.join(".")) last.v = clone(op.v);
-    else ed.ops.push(rec);
-    applyOp(ed.sides[side].edit, rec);
-  }
+  for (const [side, path] of targets) pushOp({ ...op, side, path });
   return targets.map(([side]) => side);
 }
 
@@ -604,6 +600,7 @@ function sideLines(sn, parentOut = {}) {
   const { base, edit } = s;
   const pre = [], q = [], a = [], r = [];
   const toParent = (k) => {
+    if (ed.eye) return false;
     const src = s.origin[k];
     if (s.ownKeys.includes(k) || !(k in base) || !isBaseType(src)) return false;
     const line = k + "=" + eeInline(edit[k]);
@@ -672,21 +669,50 @@ function buildMulti() {
     ...Object.entries(parentOut).map(([path, lines]) => [[">" + path], lines]),
   ];
 }
-
+const MANIFEST = "/Lotus/Types/Game/Store/ProductsManifest";
+function buildEye() {
+  const e = ed.eye, st = e.store;
+  const out = ["# " + (ed.name || tail(ed.path))];
+  const lines = sideLines("item");
+  const inner = [];
+  const block = (heads, body) => { if (inner.length) inner.push(""); inner.push(...heads, ...body.map((l) => "    " + l)); };
+  if (e.mode === "new") block(["+" + ed.path + "|" + e.base], lines);
+  if (!e.hasStore) {
+    const body = [];
+    if (st.category && !st.parent.startsWith("/Lotus/StoreItems/")) body.push("ProductCategory=" + st.category);
+    if (st.name.trim()) body.push("LocalizeTag=" + eeStr(st.name.trim()));
+    if (st.desc.trim()) body.push("LocalizeDescTag=" + eeStr(st.desc.trim()));
+    if (st.icon.trim()) body.push("Icon=" + st.icon.trim());
+    body.push("TypeName=" + ed.path);
+    block(["+" + st.path + "|" + st.parent], body);
+  }
+  if (e.manifest) block([">" + MANIFEST], ["a|StoreItems|" + st.path]);
+  const gated = inner.length && conditionExpr() !== "can_add_new_types()";
+  out.push(...(gated ? ["$if can_add_new_types()", ...inner, "$endif"] : inner));
+  if (e.mode === "asis" && lines.length) out.push("", ">" + ed.path, ...lines.map((l) => "    " + l));
+  return finish(out);
+}
+function finish(out) {
+  const cond = conditionExpr();
+  if (cond) out.splice(1, 0, "$if " + cond), out.push("$endif");
+  return out.join("\n") + "\n";
+}
+function emitBlocks(out, blocks) {
+  let any = false;
+  for (const [heads, lines] of blocks) {
+    if (!lines.length) continue;
+    if (any) out.push("");
+    any = true;
+    out.push(...heads, ...lines.map((l) => "    " + l));
+  }
+  return any;
+}
 function buildPatch() {
+  if (ed.eye) return buildEye();
   const out = ["# " + ($("#target-name").textContent || tail(ed.path))];
   if (ed.multi) {
-    let any = false;
-    for (const [heads, lines] of buildMulti()) {
-      if (!lines.length) continue;
-      if (any) out.push("");
-      any = true;
-      out.push(...heads, ...lines.map((l) => "    " + l));
-    }
-    if (!any) out.push(...ed.paths.map((p, i) => (i ? "&" : ">") + p));
-    const cond = conditionExpr();
-    if (cond) out.splice(1, 0, "$if " + cond), out.push("$endif");
-    return out.join("\n") + "\n";
+    if (!emitBlocks(out, buildMulti())) out.push(...ed.paths.map((p, i) => (i ? "&" : ">") + p));
+    return finish(out);
   }
   const parentOut = {};
   const itemLines = sideLines("item", parentOut);
@@ -703,17 +729,8 @@ function buildPatch() {
     [[">" + ed.sides.store?.path], storeLines],
     ...Object.entries(parentOut).map(([path, lines]) => [[">" + path], lines]),
   ];
-  let any = false;
-  for (const [heads, lines] of blocks) {
-    if (!lines.length) continue;
-    if (any) out.push("");
-    any = true;
-    out.push(...heads, ...lines.map((l) => "    " + l));
-  }
-  if (!any) out.push(">" + ed.path);
-  const cond = conditionExpr();
-  if (cond) out.splice(1, 0, "$if " + cond), out.push("$endif");
-  return out.join("\n") + "\n";
+  if (!emitBlocks(out, blocks)) out.push(">" + ed.path);
+  return finish(out);
 }
 
 function conditionExpr() {
@@ -737,7 +754,8 @@ function highlight(text) {
 }
 
 const saveDraft = debounce(() => {
-  if (ed) store.set("draft:" + (ed.multi ? "multi:" + ed.paths.join("|") : ed.path), { name: ed.name, ops: ed.ops, text: ed.text, showStore: ed.showStore, cond: [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] });
+  if (ed) store.set("draft:" + (ed.multi ? "multi:" + ed.paths.join("|") : (ed.eye ? "eye:" + ed.eye.mode + ":" : "") + ed.path), {
+    eye: ed.eye && { store: ed.eye.store, manifest: ed.eye.manifest }, name: ed.name, ops: ed.ops, text: ed.text, showStore: ed.showStore, cond: [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] });
 }, 400);
 
 function renderOutput() {
@@ -755,11 +773,10 @@ function refresh() {
 function leafSpec(sn, path) {
   if (ENUMS[path[path.length - 1]]) return { t: "string", enum: ENUMS[path[path.length - 1]] };
   const g = sn === "store" ? "store" : ed.group;
-  const top = FIELDS?.[g]?.[path[0]] || FIELDS?.[sn === "store" ? ed.group : "store"]?.[path[0]];
+  const top = FIELDS[g]?.[path[0]] || FIELDS[sn === "store" ? ed.group : "store"]?.[path[0]];
   if (!top) return null;
   if (path.length === 1) return top;
   const leaf = path[path.length - 1];
-  if (ENUMS[leaf]) return { t: "string", enum: ENUMS[leaf] };
   if (isIdx(leaf)) return path.length === 2 ? { t: top.it, enum: top.enum, sug: top.sug } : null;
   if (path.length === 3 && top.sub) return top.sub[leaf] || null;
   return null;
@@ -957,7 +974,7 @@ function node(sn, path, v, flt = treeFilter) {
     const show = ([kk, x]) => !narrow || deepHit(kk, x);
     n.append(h("div", { class: "line" },
       h("button", { class: "tw", onclick: toggle }, open ? "▾" : "▸"),
-      Object.assign(keyLabel(path, k, inArr, v), { onclick: toggle, className: "k click" }),
+      Object.assign(label, { onclick: toggle, className: "k click" }),
       h("span", { class: "sum", onclick: toggle }, (arr ? "list · " : "object · ") + count + (arr ? (count === 1 ? " item" : " items") : count === 1 ? " field" : " fields")),
       acts));
     if (open) {
@@ -1048,14 +1065,11 @@ let addSide = "item";
 function addOptions() {
   const s = ed.sides[addSide];
   const g = addSide === "store" ? "store" : ed.group;
-  const fields = FIELDS?.[g] || {};
+  const fields = FIELDS[g] || {};
   const missing = (k) => !(k in s.edit);
   const common = (addSide === "store" ? [] : COMMON[ed.group] || []).filter((k) => k in fields && missing(k));
-  const known = Object.keys(fields).filter((k) => missing(k) && !common.includes(k) && !HIDDEN(k)).sort();
-  return [
-    ["Common", common.map((k) => ({ key: k, hint: "" }))],
-    ["Known fields", known.map((k) => ({ key: k, hint: "" })).sort((a, b) => labelOf(a.key).localeCompare(labelOf(b.key)))],
-  ];
+  const known = Object.keys(fields).filter((k) => missing(k) && !common.includes(k) && !HIDDEN(k));
+  return [["Common", common], ["Known fields", known.sort((a, b) => labelOf(a).localeCompare(labelOf(b)))]];
 }
 
 function drawAddMenu() {
@@ -1064,11 +1078,11 @@ function drawAddMenu() {
   const list = $("#add-list");
   list.replaceChildren();
   let n = 0;
-  for (const [grp, opts] of addOptions()) {
-    const f = opts.filter((o) => !ql || (labelOf(o.key) + " " + o.key).toLowerCase().includes(ql));
+  for (const [grp, keys] of addOptions()) {
+    const f = keys.filter((k) => !ql || (labelOf(k) + " " + k).toLowerCase().includes(ql));
     if (!f.length) continue;
     list.append(h("div", { class: "grp" }, grp));
-    for (const o of f.slice(0, 400)) list.append(h("button", { class: n++ === 0 ? "sel" : "", onclick: () => pickField(o.key) }, h("span", {}, labelOf(o.key)), h("span", {}, o.hint)));
+    for (const k of f.slice(0, 400)) list.append(h("button", { class: n++ === 0 ? "sel" : "", onclick: () => pickField(k) }, h("span", {}, labelOf(k))));
   }
   if (q && /^[A-Za-z_][\w:]*$/.test(q) && !(q in ed.sides[addSide].edit)) {
     list.append(h("div", { class: "grp" }, "Custom"), h("button", { class: n ? "" : "sel", onclick: () => pickField(q) }, h("span", {}, labelOf(q)), h("span", {}, "new field")));
@@ -1078,7 +1092,7 @@ function drawAddMenu() {
 function pickField(k) {
   closeAddMenu();
   const g = addSide === "store" ? "store" : ed.group;
-  record(addSide, { t: "addKey", path: [k], v: defaultFor(FIELDS?.[g]?.[k]) });
+  record(addSide, { t: "addKey", path: [k], v: defaultFor(FIELDS[g]?.[k]) });
   ed.open.add(addSide + "|" + k);
   refresh();
   const el = [...document.querySelectorAll("#sides .node.top .k")].find((x) => x.title === k);
@@ -1096,96 +1110,144 @@ function openAddMenu(sn, wrap) {
   $("#add-search").focus();
 }
 function closeAddMenu() { $("#add-menu").hidden = true; }
-
-async function showEditor(cat, path) {
-  $("#store-opt").hidden = false;
-  ed = { cat, path, group: fieldGroup(cat, path), name: "", showStore: false, sides: null, ops: [], text: [], open: new Set(), closed: new Set(), inhOpen: new Set() };
-  $("#target-path").textContent = path;
-  $("#store-path").textContent = "";
-  $("#target-name").textContent = tail(path);
+function resetEditor(state, loading) {
+  ed = { name: "", showStore: false, sides: null, ops: [], text: [], open: new Set(), closed: new Set(), inhOpen: new Set(), ...state };
+  $("#eye-panel").hidden = true;
   $("#target-icon").removeAttribute("src");
   $("#parent-warn").hidden = true;
-  $("#sides").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), "Loading metadata from warframe-packages-bin-data…"));
+  $("#sides").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), loading));
   $("#fr").hidden = true;
   $("#fr-list").replaceChildren();
   $("#key-filter").value = "";
+  $("#output").innerHTML = "";
+  restoreCond(null);
+}
+function restoreCond(cond) {
+  [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] = cond?.length === 3 ? cond : [false, "from", ""];
+  syncCond();
+}
+function restoreDraft(draft) {
+  if (!draft) return;
+  ed.ops = (draft.ops || []).filter((o) => ed.sides[o.side]);
+  ed.text = draft.text || [];
+  restoreCond(draft.cond);
+}
+async function showEditor(cat, path, eye = null) {
+  resetEditor({ cat, path, eye, group: fieldGroup(cat, eye?.base || path) }, "Loading metadata from warframe-packages-bin-data…");
+  $("#store-opt").hidden = !!eye;
+  $("#target-path").textContent = path;
+  $("#store-path").textContent = "";
+  $("#target-name").textContent = tail(path);
   $("#also-store").checked = false;
   $("#also-store").disabled = true;
-  $("#output").innerHTML = "";
-  $("#cond-on").checked = false;
-  $("#cond-mode").value = "from";
-  $("#cond-ver").value = "";
-  syncCond();
-
-  const draft = store.get("draft:" + path);
+  const draft = store.get("draft:" + (eye ? "eye:" + eye.mode + ":" : "") + path);
+  const src = eye?.base || path;
   let item, storeItem;
   try {
-    [item, storeItem] = await Promise.all([loadType(path), loadType(toStorePath(path)), loadFields(), loadDict().catch(() => null)]);
+    [item, storeItem] = await Promise.all([loadType(src), eye ? null : loadType(toStorePath(path)), loadDict().catch(() => null)]);
   } catch (e) {
     $("#sides").replaceChildren(h("div", { class: "empty" }, "Could not load metadata: " + e.message));
     return;
   }
   if (!ed || ed.path !== path) return;
-  const side = (p, t) => ({ path: p, own: t?.own || {}, eff: t?.data || {}, origin: t?.origin || {}, ownKeys: Object.keys(t?.own || {}) });
-  [item, storeItem] = await Promise.all([absolutize(item, path), absolutize(storeItem, toStorePath(path))]);
+  [item, storeItem] = await Promise.all([absolutize(item, src), absolutize(storeItem, toStorePath(path))]);
   if (!ed || ed.path !== path) return;
-  ed.sides = { item: side(path, item), store: storeItem ? side(toStorePath(path), storeItem) : null };
+  if (eye?.mode === "new" && item) item = { ...item, own: {}, parents: [], origin: Object.fromEntries(Object.keys(item.data).map((k) => [k, src])) };
+  ed.sides = { item: makeSide(path, item), store: storeItem ? makeSide(toStorePath(path), storeItem) : null };
+  if (eye) {
+    const own = await loadType(toStorePath(src));
+    const kind = catOfPath(src);
+    const g = eye.mode === "new" && own ? { parent: toStorePath(src), category: "" } : await guessStore(src, kind);
+    const d = eye.mode === "asis" ? item?.data || {} : {};
+    eye.hasStore = eye.mode === "asis" && !!own;
+    eye.manifest = true;
+    eye.store = { path: toStorePath(path), parent: g.parent, category: g.category, name: d.LocalizeTag || "", desc: d.LocalizeDescTag || "", icon: d.Icon || "" };
+    if (draft?.eye) Object.assign(eye.store, draft.eye.store), (eye.manifest = draft.eye.manifest);
+    drawEyePanel();
+  }
 
-  if (CATS[cat]) try { ed.entry = (await loadList(cat)).find((i) => i.path === path); } catch {}
-  const name = ed.entry?.name || loc(ed.sides.item.eff.LocalizeTag) || tail(path);
+  if (CATS[cat]) try { ed.entry = (await loadList(cat)).find((i) => i.path === src); } catch {}
+  const name = eye?.mode === "new" ? tail(path) : ed.entry?.name || loc(ed.sides.item.eff.LocalizeTag) || tail(path);
   $("#target-name").textContent = name;
   const icon = ed.entry?.icon || ed.sides.item.eff.Icon;
   if (icon) {
     $("#target-icon").style.visibility = "";
-    $("#target-icon").onerror = (e) => (e.target.style.visibility = "hidden");
+    $("#target-icon").onerror = hideBroken;
     $("#target-icon").src = IMG + icon;
   }
   $("#also-store").disabled = !ed.sides.store;
   ed.showStore = !!ed.sides.store;
   $("#also-store").checked = ed.showStore;
   $("#store-path").textContent = ed.sides.store ? ed.sides.store.path : "(no StoreItem for this type)";
-  const base = (item?.parents || []).find(isBaseType);
+  const base = eye ? null : (item?.parents || []).find(isBaseType);
   $("#parent-warn").replaceChildren(...(base ? [
     "You also need to edit the parent type (", h("a", { href: "#/edit?c=" + cat + "&p=" + encodeURIComponent(base) }, tail(base)), ") for some changes to take effect.",
   ] : []));
   $("#parent-warn").hidden = !base;
   if (!item) toast("No metadata found for this path in bin-data");
+  if (eye?.mode === "new") $("#target-path").textContent = path + "  (new, based on " + src + ")";
 
   ed.name = draft?.name ?? name;
   $("#patch-name").value = ed.name;
-  if (draft) {
-    ed.ops = (draft.ops || []).filter((o) => ed.sides[o.side]);
-    ed.text = draft.text || [];
-    if ("showStore" in draft) ed.showStore = !!(draft.showStore && ed.sides.store);
-    [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] = draft.cond?.length === 3 ? draft.cond : [false, "from", ""];
-    syncCond();
-    $("#also-store").checked = ed.showStore;
-  }
-  replay("item");
-  if (ed.sides.store) replay("store");
+  restoreDraft(draft);
+  if (draft && "showStore" in draft) ed.showStore = !!(draft.showStore && ed.sides.store);
+  $("#also-store").checked = ed.showStore;
+  replayAll();
   refresh();
 }
+async function guessStore(target, kind) {
+  if (kind === "suit") return { parent: "/Lotus/Types/Game/StoreItemSpecializations/PowerSuitStoreItem", category: "Suits" };
+  if (kind === "weapon") {
+    let category = "LongGuns";
+    try { category = (await loadList("weapon")).find((i) => i.path === target)?.raw.productCategory || category; } catch {}
+    return { parent: "/Lotus/Types/Game/StoreItemSpecializations/LotusWeaponStoreItem", category };
+  }
+  if (/\/(Skins|Accessory)\//.test(target) || (await loadCustoms()).some((c) => c.path === target))
+    return { parent: "/Lotus/Types/Game/StoreItemSpecializations/LotusSuitCustomizationStoreItem", category: "WeaponSkins" };
+  return { parent: "/Lotus/Types/Game/StoreItems/AutoStoreItem", category: "" };
+}
+
+let customsPromise = null;
+function loadCustoms() {
+  if (!customsPromise) customsPromise = Promise.all([getJSON(`${PEP}/ExportCustoms.json`), loadDict()]).then(([c]) =>
+    Object.entries(c).map(([path, e]) => ({ path, name: cleanName(e.name, path), icon: e.icon }))).catch(() => []);
+  return customsPromise;
+}
+
+function eyeField(label, value, onInput, opts = {}) {
+  const input = opts.options
+    ? h("select", { class: "input mini" }, opts.options.map((o) => h("option", { value: o, selected: o === value }, o || "(none)")))
+    : h("input", { class: "input mini", value, spellcheck: "false", autocomplete: "off", placeholder: opts.placeholder || "" });
+  input.addEventListener(opts.options ? "change" : "input", () => { onInput(input.value); renderOutput(); });
+  return h("label", { class: "eye-field" }, h("span", { class: "label" }, label), input);
+}
+
+function drawEyePanel() {
+  const e = ed.eye, st = e.store, el = $("#eye-panel");
+  el.hidden = false;
+  const cats = [...new Set(["", st.category, ...(FIELDS.store?.ProductCategory?.enum || [])])];
+  el.replaceChildren(
+    e.hasStore
+      ? h("p", { class: "muted small" }, "This item already has a StoreItem (" + st.path + "), so only the store entry is added.")
+      : h("div", { class: "eye-grid" },
+          eyeField("StoreItem path", st.path, (v) => (st.path = v.trim())),
+          eyeField("Parent StoreItem type", st.parent, (v) => (st.parent = v.trim())),
+          st.parent.startsWith("/Lotus/StoreItems/") ? h("span", { class: "muted small eye-note" }, "Category and other store details are inherited from the parent StoreItem.") : eyeField("Category", st.category, (v) => (st.category = v), { options: cats }),
+          eyeField("Name", st.name, (v) => (st.name = v), { placeholder: "Plain text or /Lotus/Language/… key" }),
+          eyeField("Description", st.desc, (v) => (st.desc = v), { placeholder: "Plain text or /Lotus/Language/… key" }),
+          eyeField("Icon", st.icon, (v) => (st.icon = v), { placeholder: "/Lotus/Interface/Icons/…" })),
+    h("label", { class: "check" }, Object.assign(h("input", { type: "checkbox", checked: e.manifest }), { onchange: (ev) => { e.manifest = ev.target.checked; renderOutput(); } }), h("span", {}, "Add it to the in-game store")));
+}
 async function showMulti(cat, paths) {
-  ed = { cat, path: paths[0], paths, multi: true, group: fieldGroup(cat, paths[0]), name: "", showStore: false, sides: null, ops: [], text: [], open: new Set(), closed: new Set(), inhOpen: new Set() };
-  $("#target-icon").removeAttribute("src");
+  resetEditor({ cat, path: paths[0], paths, multi: true, group: fieldGroup(cat, paths[0]) }, "Loading metadata for " + paths.length + " items…");
   $("#target-icon").style.visibility = "hidden";
-  $("#parent-warn").hidden = true;
   $("#store-opt").hidden = true;
   $("#target-name").textContent = paths.length + " items";
   $("#target-path").textContent = paths.join("  &  ");
-  $("#sides").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), "Loading metadata for " + paths.length + " items…"));
-  $("#fr").hidden = true;
-  $("#fr-list").replaceChildren();
-  $("#key-filter").value = "";
-  $("#output").innerHTML = "";
-  $("#cond-on").checked = false;
-  $("#cond-mode").value = "from";
-  $("#cond-ver").value = "";
-  syncCond();
   const draft = store.get("draft:multi:" + paths.join("|"));
   let types, stores;
   try {
-    await Promise.all([loadFields(), loadDict().catch(() => null)]);
+    await loadDict().catch(() => null);
     types = await Promise.all(paths.map(async (p) => absolutize(await loadType(p), p)));
     stores = await Promise.all(paths.map(async (p) => (p.startsWith("/Lotus/StoreItems/") ? null : absolutize(await loadType(toStorePath(p)), toStorePath(p)))));
   } catch (e) {
@@ -1193,31 +1255,20 @@ async function showMulti(cat, paths) {
     return;
   }
   if (!ed || ed.paths !== paths) return;
-  const missing = paths.filter((p, i) => !types[i]);
+  const missing = paths.filter((_, i) => !types[i]);
   if (missing.length) toast("Not found in bin-data: " + missing.map(tail).join(", "));
   ed.sides = {};
   paths.forEach((p, i) => {
-    const t = types[i];
-    ed.sides["m" + i] = { path: p, own: t?.own || {}, eff: t?.data || {}, origin: t?.origin || {}, ownKeys: Object.keys(t?.own || {}) };
-    const st = stores[i];
-    if (st) ed.sides["s" + i] = { path: toStorePath(p), own: st.own, eff: st.data, origin: st.origin || {}, ownKeys: Object.keys(st.own) };
+    ed.sides["m" + i] = makeSide(p, types[i]);
+    if (stores[i]) ed.sides["s" + i] = makeSide(toStorePath(p), stores[i]);
   });
   ed.sides.all = { path: "", origin: {}, ownKeys: [] };
-  let names = paths.map(tail);
-  try {
-    const lists = await Promise.all(Object.keys(CATS).map((c) => loadList(c).catch(() => [])));
-    const byPath = new Map(lists.flat().map((i) => [i.path, i.name]));
-    names = paths.map((p) => byPath.get(p) || tail(p));
-  } catch {}
+  const byPath = new Map((await loadAllLists()).map((i) => [i.path, i.name]));
+  const names = paths.map((p) => byPath.get(p) || tail(p));
   $("#target-name").textContent = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
   ed.name = draft?.name ?? names.join(", ");
   $("#patch-name").value = ed.name;
-  if (draft) {
-    ed.ops = (draft.ops || []).filter((o) => ed.sides[o.side]);
-    ed.text = draft.text || [];
-    [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] = draft.cond?.length === 3 ? draft.cond : [false, "from", ""];
-    syncCond();
-  }
+  restoreDraft(draft);
   replayAll();
   refresh();
 }
@@ -1260,8 +1311,7 @@ function initEditor() {
     if (kind === "s") { try { new RegExp(from); } catch { toast("Invalid regex"); return; } }
     ed.text.push({ kind, from, to });
     $("#fr-from").value = $("#fr-to").value = "";
-    replay("item");
-    if (ed.sides.store) replay("store");
+    replayAll();
     refresh();
   };
   $("#btn-copy").onclick = async () => {
@@ -1276,6 +1326,43 @@ function initEditor() {
     toast("Saved " + name + ".txt");
   };
 }
+function fillPathList(list, items, byName) {
+  for (const i of items) byName.set(i.name.toLowerCase(), i.path);
+  list.replaceChildren(...items.map((i) => h("option", { value: i.path }, i.name)));
+}
+function initEye() {
+  const input = $("#eye-path"), np = $("#eye-newpath"), status = $("#eye-status");
+  const byName = new Map();
+  let filled = false;
+  input.addEventListener("focus", async () => {
+    if (filled) return;
+    filled = true;
+    const [lists, customs] = await Promise.all([loadAllLists(), loadCustoms()]);
+    fillPathList($("#eye-list"), lists.concat(customs), byName);
+  });
+  const mode = () => document.querySelector('input[name="eye-mode"]:checked').value;
+  const resolve = () => byName.get(input.value.trim().toLowerCase()) || normalizePath(input.value);
+  const suggest = () => {
+    const p = resolve();
+    if (mode() === "new" && p && (!np.value || np.dataset.auto === "1")) { np.value = p + "Custom"; np.dataset.auto = "1"; }
+  };
+  for (const r of document.querySelectorAll('input[name="eye-mode"]')) r.addEventListener("change", () => { $("#eye-new").hidden = mode() !== "new"; suggest(); });
+  input.addEventListener("change", suggest);
+  np.addEventListener("input", () => (np.dataset.auto = ""));
+  $("#eye-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const target = resolve();
+    if (!target) return;
+    status.innerHTML = '<span class="spinner"></span>Looking up ' + esc(target) + "…";
+    if (!(await loadType(target))) { status.textContent = target + " was not found in warframe-packages-bin-data."; return; }
+    if (mode() === "asis") { status.textContent = ""; location.hash = "#/edit?eye=asis&p=" + encodeURIComponent(target); return; }
+    const newPath = normalizePath(np.value);
+    if (!newPath || newPath === target) { status.textContent = "Give the new item its own path."; return; }
+    if (await loadType(newPath)) { status.textContent = newPath + " already exists. Pick another path, or use \"Make it obtainable as it is\"."; return; }
+    status.textContent = "";
+    location.hash = "#/edit?eye=new&base=" + encodeURIComponent(target) + "&p=" + encodeURIComponent(newPath);
+  };
+}
 function normalizePath(raw) {
   let p = raw.trim().replace(/\\/g, "/").replace(/\.json$/i, "");
   if (!p) return "";
@@ -1284,7 +1371,8 @@ function normalizePath(raw) {
   return p;
 }
 function initBlank() {
-  const form = $("#blank-form"), input = $("#blank-path"), status = $("#blank-status"), hint = status.innerHTML;
+  const form = $("#blank-form"), input = $("#blank-path");
+  const byName = new Map();
   let suggested = false;
   $("#btn-blank").onclick = () => {
     form.hidden = !form.hidden;
@@ -1292,20 +1380,14 @@ function initBlank() {
     input.focus();
     if (suggested) return;
     suggested = true;
-    Promise.all(Object.keys(CATS).map((c) => loadList(c).catch(() => []))).then((lists) => {
-      const all = lists.flat();
-      byName = new Map(all.map((i) => [i.name.toLowerCase(), i.path]));
-      $("#blank-list").replaceChildren(...all.map((i) => h("option", { value: i.path }, i.name)));
-    });
+    loadAllLists().then((all) => fillPathList($("#blank-list"), all, byName));
   };
-  let byName = new Map();
   form.onsubmit = async (e) => {
     e.preventDefault();
     const typed = input.value.trim();
     const parts = byName.has(typed.toLowerCase()) ? [typed] : typed.split(/[\s,&]+/).filter(Boolean);
     const paths = [...new Set(parts.map((x) => byName.get(x.toLowerCase()) || normalizePath(x)).filter(Boolean))];
     if (!paths.length) return;
-    status.innerHTML = hint;
     location.hash = "#/edit?c=" + catOfPath(paths[0]) + paths.map((p) => "&p=" + encodeURIComponent(p)).join("");
   };
 }
@@ -1421,7 +1503,6 @@ function parsePatchText(text) {
       patch.newType = { path, parent, line: ln };
       addKeys(path, ln);
       if (!parent.startsWith("/")) add(ln, "error", "The parent type must be a full path starting with /.");
-      add(ln, "info", "New types need U42 or newer. Consider wrapping this in <code>$if can_add_new_types()</code>.");
     } else if (/^[rsqa]\|/.test(t)) {
       const kind = t[0];
       const sep = t.indexOf("|", 2);
@@ -1500,6 +1581,10 @@ async function verifyPatch(parsed) {
     }
     if (newTypes.has(path)) add(list[0].ln, "warning", `<code>${esc(tail(path))}</code> already exists, so the + line will not create it.`);
     const own = t.own, raw = eeText(own), name = esc(tail(path) + (path.startsWith("/Lotus/StoreItems/") ? " (StoreItem)" : ""));
+    if (!Object.keys(t.data).length) {
+      if (list.some(({ p }) => p.q.length || p.a.length || p.r.length || p.s.length)) add(list[0].ln, "info", `The game data has no fields for ${name}, so its lines can't be checked here.`);
+      return;
+    }
     for (const { p } of list) {
       for (const q of p.q) {
         const v = getAt(own, q.a.split("."));
@@ -1634,7 +1719,10 @@ function route() {
   const hash = location.hash || "#/";
   const show = (id) => { for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== id; };
   closeAddMenu();
-  if (hash === "#/check") {
+  if (hash === "#/eye") {
+    show("view-eye");
+    $("#eye-path").focus();
+  } else if (hash === "#/check") {
     show("view-check");
     $("#check-input").focus();
   } else if (hash === "#/pick" || hash === "#/pick/") {
@@ -1645,11 +1733,13 @@ function route() {
   } else if (hash.startsWith("#/edit")) {
     const q = new URLSearchParams(hash.split("?")[1] || "");
     const ps = q.getAll("p").filter((x) => x.startsWith("/Lotus/"));
+    const eyeMode = q.get("eye"), eyeBase = q.get("base");
     const p = ps[0];
     if (!p) { location.hash = "#/pick/weapon"; return; }
     show("view-edit");
     window.scrollTo(0, 0);
-    if (ps.length > 1) showMulti(CATS[q.get("c")] ? q.get("c") : catOfPath(p), [...new Set(ps)]);
+    if (eyeMode === "asis" || (eyeMode === "new" && eyeBase?.startsWith("/Lotus/"))) showEditor(catOfPath(eyeBase || p), p, { mode: eyeMode, base: eyeMode === "new" ? eyeBase : null });
+    else if (ps.length > 1) showMulti(CATS[q.get("c")] ? q.get("c") : catOfPath(p), [...new Set(ps)]);
     else showEditor(CATS[q.get("c")] ? q.get("c") : catOfPath(p), p);
   } else {
     show("view-home");
@@ -1658,6 +1748,7 @@ function route() {
 initHome();
 initEditor();
 initBlank();
+initEye();
 initMulti();
 initCheck();
 $("#cats").addEventListener("click", (e) => { if (e.target.dataset.cat) location.hash = "#/pick/" + e.target.dataset.cat; });

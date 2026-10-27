@@ -25,7 +25,7 @@
     </div>
   </div>
   </section>
-<section id="view-choose" class="view choose" hidden>
+<section id="view-choose" class="view" hidden>
   <header class="bar">
     <a href="#/" class="brand">Metadata Patch Builder</a>
     <span></span>
@@ -45,7 +45,27 @@
     </div>
   </div>
 </section>
-
+<section id="view-eye" class="view" hidden>
+  <header class="bar">
+    <a href="#/" class="brand">Metadata Patch Builder</a>
+    <nav class="bar-center"><a class="navlink" href="#/pick">New patch</a><a class="navlink" href="#/check">Check my patch</a></nav>
+    <span></span>
+  </header>
+  <form class="eye-inner" id="eye-form">
+    <label class="label" for="eye-path">Item</label>
+    <input class="input" id="eye-path" list="eye-list" placeholder="Search by name or paste a path, e.g. /Lotus/Powersuits/Stalker/Stalker" spellcheck="false" autocomplete="off">
+    <datalist id="eye-list"></datalist>
+    <div class="eye-modes">
+      <label class="check"><input type="radio" name="eye-mode" value="asis" checked> <span>Make it obtainable as it is</span></label>
+      <label class="check"><input type="radio" name="eye-mode" value="new"> <span>Create a new item based on it</span></label>
+    </div>
+    <div id="eye-new" hidden>
+      <label class="label" for="eye-newpath">New item path</label>
+      <input class="input" id="eye-newpath" placeholder="/Lotus/Upgrades/Skins/Excalibur/MyNewSkin" spellcheck="false" autocomplete="off">
+    </div>
+    <div class="eye-actions"><button class="btn btn-primary start" type="submit">Continue</button><span class="muted small" id="eye-status"></span></div>
+  </form>
+</section>
 <section id="view-check" class="view" hidden>
   <header class="bar">
     <a href="#/" class="brand">Metadata Patch Builder</a>
@@ -132,6 +152,7 @@
         <div class="warn" id="parent-warn" hidden></div>
       </div>
     </div>
+    <div class="eye-panel" id="eye-panel" hidden></div>
   </div>
   <div class="edit-body">
     <div class="pane">
