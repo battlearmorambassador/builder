@@ -227,7 +227,8 @@ async function loadList(cat) {
       if (cat === "upgrade") sub = expName === "ExportArcanes" || path.includes("/CosmeticEnhancers/") ? "Arcanes" : "Mods";
       else sub = def.sub[e.productCategory] || "Other";
       const name = (loc(e.name) || tail(path)).replace(/<[^>]+>\s*/g, "");
-      items.push({ path, name, icon: e.icon, sub, cat, raw: e, search: (name + " " + path).toLowerCase() });
+      const flag = e.isFrivolous && !NOT_IMPOSTOR.has(path) ? "impostor" : e.isStarter ? "flawed" : null;
+      items.push({ path, name, icon: e.icon, sub, cat, raw: e, flag, search: (name + " " + path + " " + (flag || "")).toLowerCase() });
     }
   });
   items.sort((a, b) => a.name.localeCompare(b.name));
@@ -261,9 +262,40 @@ function initHome() {
     c.icon ? h("img", { src: IMG + c.icon, alt: "", onerror: (e) => (e.target.style.visibility = "hidden") }) : null,
     h("span", { class: "nm" }, c.name), c.sub ? h("span", { class: "muted small" }, c.sub) : null)));
 }
+const NOT_IMPOSTOR = new Set(["/Lotus/Powersuits/Banshee/SonarPvPAugmentCard"]);
 
+const MOD_FLAGS = {
+  impostor: {
+    label: "Impostor",
+    text: "Exists in the game files but can't be officially obtained in game.",
+    svg: '<svg viewBox="0 0 32 32" width="16" height="16" aria-hidden="true" stroke="#0b0b0b" stroke-width="1.4" stroke-linejoin="round"><rect x="4.3" y="11.5" width="5.4" height="12" rx="2.6" fill="#e2312b"/><path d="M8.6 11.2C8.6 6 11.6 3.2 16.4 3.2c4.9 0 8.2 2.4 8.2 6.8V23c0 2.4-.8 4.6-1.6 5.6h-4.2v-3.9c-1-.5-2.9-.5-3.9 0v3.9h-4.1c-.9-.9-1.5-3-1.6-5.4Z" fill="#e2312b"/><rect x="14.6" y="7.4" width="12.6" height="7.4" rx="3.7" fill="#b9c0c8"/></svg>',
+  },
+  flawed: {
+    label: "Flawed",
+    text: "Get yours from Iron Wake! Or... Use WebUI.",
+    svg: `<img src="${IMG}/Lotus/Interface/Icons/Antivirus/Broken.png" width="20" height="20" alt="" loading="lazy">`,
+  },
+};
+
+function modBadge(flag) {
+  const f = MOD_FLAGS[flag];
+  const el = h("span", { class: "tip mod-flag " + flag, tabindex: "0" });
+  el.innerHTML = f.svg + `<span class="tip-box" role="tooltip"><strong>${f.label}</strong><br>${esc(f.text)}</span>`;
+  return el;
+}
+
+function drawLegend(cat) {
+  const el = $("#pick-legend");
+  el.hidden = cat !== "upgrade";
+  if (el.hidden || el.childElementCount) return;
+  Object.keys(MOD_FLAGS).forEach((k, i) => {
+    if (i) el.append(h("span", { class: "sep" }, "·"));
+    const icon = h("span", { class: "mod-flag " + k });
+    icon.innerHTML = MOD_FLAGS[k].svg;
+    el.append(h("span", { class: "legend-item" }, icon, MOD_FLAGS[k].label));
+  });
+}
 const pick = { cat: null, sub: null, items: [], shown: 0, filtered: [], multi: false, chosen: new Map() };
-
 function drawChosen() {
   const n = pick.chosen.size;
   $("#multi-bar").hidden = !pick.multi;
@@ -294,6 +326,7 @@ const PAGE = 180;
 
 async function showPicker(cat) {
   if (!CATS[cat]) cat = "weapon";
+  drawLegend(cat);
   for (const b of $("#cats").children) b.classList.toggle("on", b.dataset.cat === cat);
   if (pick.cat !== cat) {
     pick.cat = cat;
@@ -350,6 +383,7 @@ function morePicker() {
     } },
       it.icon ? h("img", { src: IMG + it.icon, loading: "lazy", alt: "", onerror: (e) => (e.target.style.visibility = "hidden") }) : h("img", { alt: "" }),
       h("span", { class: "nm" }, it.name),
+      it.flag ? modBadge(it.flag) : null,
     )));
   $("#pick-status").textContent = `${pick.filtered.length} item${pick.filtered.length === 1 ? "" : "s"}`;
   if (pick.shown < pick.filtered.length) {
@@ -460,8 +494,10 @@ function strip(v) {
   return v;
 }
 
+const itemSides = () => realSides().filter((k) => k.startsWith("m"));
+
 function rebuildAll() {
-  const all = ed.sides.all, rs = realSides().map((k) => ed.sides[k]);
+  const all = ed.sides.all, rs = itemSides().map((k) => ed.sides[k]);
   const shared = (pick) => Object.keys(pick(rs[0])).filter((k) => rs.every((r) => k in pick(r)));
   const build = (pick) => Object.fromEntries(shared(pick).map((k) => [k, strip(merge(rs.map((r) => pick(r)[k])))]).filter(([, v]) => v !== undefined));
   all.base = build((r) => r.base);
@@ -475,8 +511,12 @@ function recordAll(op) {
   const k = op.path[0];
   for (const sn of realSides()) {
     const r = ed.sides[sn];
+    const storeSide = sn.startsWith("s");
+    if (storeSide && op.t === "addKey") continue;
     let path = op.t === "addKey" || op.path.length === 1 ? op.path : matchPath(all.edit, r.edit, op.path, op.t === "del");
     if (!path) continue;
+    if (storeSide && !hasAt(r.edit, path)) continue;
+    if (storeSide && op.t === "set" && isObj(getAt(r.edit, path)) !== isObj(op.v)) continue;
     let o = { ...op, path };
     if (op.t === "del" && path.length === 1 && !r.ownKeys.includes(k)) {
       const cur = r.edit[k];
@@ -795,7 +835,8 @@ function leafWidget(sn, path, v, n) {
     sel.addEventListener("change", () => set(+sel.value));
     return sel;
   }
-  if (spec?.enum && typeof v === "string") {
+  const textField = !isIdx(path[path.length - 1]) && /Loc|Desc|HelpText/.test(key || "");
+  if (spec?.enum && typeof v === "string" && !textField) {
     const vals = spec.enum.includes(v) ? spec.enum : [v, ...spec.enum];
     const sel = key === "UpgradeType" ? statSelect(vals, v) : h("select", { class: "input mini" }, vals.map((x) => h("option", { value: x, selected: x === v }, enumLabel(x))));
     sel.addEventListener("change", () => set(sel.value));
@@ -834,7 +875,6 @@ function leafWidget(sn, path, v, n) {
     return wrap;
   }
   const orig = getAt(ed.sides[sn].base, path);
-  const textField = !isIdx(path[path.length - 1]) && /Loc|Desc|HelpText/.test(key || "");
   const shown = textField && typeof v === "string" && loc(v) ? loc(v) : null;
   if (shown) {
     inp.value = shown;
@@ -883,7 +923,6 @@ function newItem(sn, path, arr) {
 let treeFilter = "";
 const nameHit = (k) => !isIdx(k) && (k + " " + labelOf(k)).toLowerCase().includes(treeFilter);
 const deepHit = (k, v) => nameHit(k) || (isObj(v) && Object.entries(v).some(([kk, x]) => deepHit(kk, x)));
-
 function node(sn, path, v, flt = treeFilter) {
   const s = ed.sides[sn];
   const id = sn + "|" + path.join(".");
@@ -972,7 +1011,7 @@ function renderSide(sn) {
   return h("div", { class: "sec", "data-side": sn },
     h("div", { class: "sec-head" },
       h("div", {}, h("div", { class: "sec-title" }, sn === "all" ? `Shared metadata of ${realSides().length} items` : sn === "item" ? "Item metadata" : "StoreItem metadata"),
-        sn === "all" ? h("div", { class: "muted small" }, "Only values that are identical in every item are shown. Changes apply to all of them.") : h("code", { class: "muted small" }, s.path)),
+        sn === "all" ? h("div", { class: "muted small" }, "Only values that are identical in every item are shown. Changes apply to all of them, and to their StoreItems wherever the same value exists.") : h("code", { class: "muted small" }, s.path)),
       addWrap),
     h("div", { class: "tree" },
       own.filter(match).map((k) => node(sn, [k], s.edit[k])),
@@ -1144,10 +1183,11 @@ async function showMulti(cat, paths) {
   $("#cond-ver").value = "";
   syncCond();
   const draft = store.get("draft:multi:" + paths.join("|"));
-  let types;
+  let types, stores;
   try {
     await Promise.all([loadFields(), loadDict().catch(() => null)]);
     types = await Promise.all(paths.map(async (p) => absolutize(await loadType(p), p)));
+    stores = await Promise.all(paths.map(async (p) => (p.startsWith("/Lotus/StoreItems/") ? null : absolutize(await loadType(toStorePath(p)), toStorePath(p)))));
   } catch (e) {
     $("#sides").replaceChildren(h("div", { class: "empty" }, "Could not load metadata: " + e.message));
     return;
@@ -1159,6 +1199,8 @@ async function showMulti(cat, paths) {
   paths.forEach((p, i) => {
     const t = types[i];
     ed.sides["m" + i] = { path: p, own: t?.own || {}, eff: t?.data || {}, origin: t?.origin || {}, ownKeys: Object.keys(t?.own || {}) };
+    const st = stores[i];
+    if (st) ed.sides["s" + i] = { path: toStorePath(p), own: st.own, eff: st.data, origin: st.origin || {}, ownKeys: Object.keys(st.own) };
   });
   ed.sides.all = { path: "", origin: {}, ownKeys: [] };
   let names = paths.map(tail);
@@ -1234,7 +1276,6 @@ function initEditor() {
     toast("Saved " + name + ".txt");
   };
 }
-
 function normalizePath(raw) {
   let p = raw.trim().replace(/\\/g, "/").replace(/\.json$/i, "");
   if (!p) return "";
@@ -1242,7 +1283,6 @@ function normalizePath(raw) {
   if (!p.startsWith("/Lotus/")) p = "/Lotus" + p;
   return p;
 }
-
 function initBlank() {
   const form = $("#blank-form"), input = $("#blank-path"), status = $("#blank-status"), hint = status.innerHTML;
   let suggested = false;
