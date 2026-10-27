@@ -1060,8 +1060,8 @@ function renderFr() {
     h("button", { class: "btn-x", title: "Remove", onclick: () => { ed.text.splice(i, 1); replayAll(); refresh(); } }, "×"))));
   if (ed.text.length) $("#fr").hidden = false;
 }
-
 let addSide = "item";
+const addMenu = $("#add-menu"), addSearch = $("#add-search"), addList = $("#add-list");
 function addOptions() {
   const s = ed.sides[addSide];
   const g = addSide === "store" ? "store" : ed.group;
@@ -1071,21 +1071,19 @@ function addOptions() {
   const known = Object.keys(fields).filter((k) => missing(k) && !common.includes(k) && !HIDDEN(k));
   return [["Common", common], ["Known fields", known.sort((a, b) => labelOf(a).localeCompare(labelOf(b)))]];
 }
-
 function drawAddMenu() {
-  const q = $("#add-search").value.trim();
+  const q = addSearch.value.trim();
   const ql = q.toLowerCase();
-  const list = $("#add-list");
-  list.replaceChildren();
+  addList.replaceChildren();
   let n = 0;
   for (const [grp, keys] of addOptions()) {
     const f = keys.filter((k) => !ql || (labelOf(k) + " " + k).toLowerCase().includes(ql));
     if (!f.length) continue;
-    list.append(h("div", { class: "grp" }, grp));
-    for (const k of f.slice(0, 400)) list.append(h("button", { class: n++ === 0 ? "sel" : "", onclick: () => pickField(k) }, h("span", {}, labelOf(k))));
+    addList.append(h("div", { class: "grp" }, grp));
+    for (const k of f.slice(0, 400)) addList.append(h("button", { class: n++ === 0 ? "sel" : "", onclick: () => pickField(k) }, h("span", {}, labelOf(k))));
   }
   if (q && /^[A-Za-z_][\w:]*$/.test(q) && !(q in ed.sides[addSide].edit)) {
-    list.append(h("div", { class: "grp" }, "Custom"), h("button", { class: n ? "" : "sel", onclick: () => pickField(q) }, h("span", {}, labelOf(q)), h("span", {}, "new field")));
+    addList.append(h("div", { class: "grp" }, "Custom"), h("button", { class: n ? "" : "sel", onclick: () => pickField(q) }, h("span", {}, labelOf(q)), h("span", {}, "new field")));
   }
 }
 
@@ -1102,14 +1100,13 @@ function pickField(k) {
 
 function openAddMenu(sn, wrap) {
   addSide = sn;
-  const m = $("#add-menu");
-  wrap.append(m);
-  m.hidden = false;
-  $("#add-search").value = "";
+  wrap.append(addMenu);
+  addMenu.hidden = false;
+  addSearch.value = "";
   drawAddMenu();
-  $("#add-search").focus();
+  addSearch.focus();
 }
-function closeAddMenu() { $("#add-menu").hidden = true; }
+function closeAddMenu() { addMenu.hidden = true; }
 function resetEditor(state, loading) {
   ed = { name: "", showStore: false, sides: null, ops: [], text: [], open: new Set(), closed: new Set(), inhOpen: new Set(), ...state };
   $("#eye-panel").hidden = true;
@@ -1279,11 +1276,11 @@ function syncCond() {
 }
 
 function initEditor() {
-  $("#add-menu").onclick = (e) => e.stopPropagation();
+  addMenu.onclick = (e) => e.stopPropagation();
   document.addEventListener("click", closeAddMenu);
-  $("#add-search").addEventListener("input", drawAddMenu);
-  $("#add-search").addEventListener("keydown", (e) => {
-    const btns = [...$("#add-list").querySelectorAll("button")];
+  addSearch.addEventListener("input", drawAddMenu);
+  addSearch.addEventListener("keydown", (e) => {
+    const btns = [...addList.querySelectorAll("button")];
     const i = btns.findIndex((b) => b.classList.contains("sel"));
     if (e.key === "Escape") closeAddMenu();
     else if (e.key === "Enter") { e.preventDefault(); btns[i]?.click(); }
