@@ -96,14 +96,14 @@ const ENUM_NAMES = {
   DT_IMPACT: "Impact", DT_PUNCTURE: "Puncture", DT_SLASH: "Slash", DT_FIRE: "Heat", DT_FREEZE: "Cold",
   DT_ELECTRICITY: "Electricity", DT_POISON: "Toxin", DT_EXPLOSION: "Blast", DT_GAS: "Gas", DT_MAGNETIC: "Magnetic",
   DT_RADIATION: "Radiation", DT_VIRAL: "Viral", DT_CORROSIVE: "Corrosive", DT_FINISHER: "True", DT_RADIANT: "Void",
-  DT_SENTIENT: "Tau", COMMON: "Common", UNCOMMON: "Uncommon", RARE: "Rare", LEGENDARY: "Legendary",
+  DT_SENTIENT: "Tau", DT_ANY: "Any", COMMON: "Common", UNCOMMON: "Uncommon", RARE: "Rare", LEGENDARY: "Legendary",
   MM_HIDDEN: "Hidden", MM_VISIBLE: "Visible", ADD: "Add (+)", MULTIPLY: "Multiply (×)", STACKING_MULTIPLY: "Stacking add (+)",
   QA_NONE: "None", QA_LOW: "Low", QA_MEDIUM: "Medium", QA_HIGH: "High", QA_VERY_HIGH: "Very high",
 };
 const enumLabel = (v) => OP_NAMES[v] || ENUM_NAMES[v] || (v === "" ? "(none)" : /^[A-Z0-9_]+$/.test(v) ? humanize(v) : v);
 
 const COMMON = {
-  weapon: ["LocalizeTag", "LocalizeDescTag", "Icon", "ArtifactSlots", "OmegaAttenuation", "RequiredLevel", "MarketMode", "ExcludeFromCodex"],
+  weapon: ["LocalizeTag", "LocalizeDescTag", "Icon", "ArtifactSlots", "RequiredLevel", "MarketMode", "ExcludeFromCodex"],
   suit: ["LocalizeTag", "LocalizeDescTag", "Icon", "ArtifactSlots", "MaxHealthOverride", "MaxShieldOverride", "ArmourRatingOverride", "MaxEnergy", "InitialEnergy", "MovementSpeedMultiplier", "AbilityTypes", "PassiveAbilityLocTag"],
   mod: ["LocalizeTag", "LocalizeDescTag", "Icon", "ArtifactPolarity", "BaseDrain", "FusionLimit", "Rarity", "ItemCompatibility", "IncompatibilityTags"],
   arcane: ["LocalizeTag", "LocalizeDescTag", "Icon", "Rarity", "FusionLimit", "ItemCompatibility"],
@@ -285,7 +285,11 @@ const MOD_FLAGS = {
     svg: `<img src="${IMG}/Lotus/Interface/Icons/Antivirus/Broken.png" width="20" height="20" alt="" loading="lazy">`,
   },
 };
-
+function flagIcon(flag) {
+  const el = h("span", { class: "mod-flag " + flag, title: MOD_FLAGS[flag].label });
+  el.innerHTML = MOD_FLAGS[flag].svg;
+  return el;
+}
 function modBadge(flag) {
   const f = MOD_FLAGS[flag];
   const el = h("span", { class: "tip mod-flag " + flag, tabindex: "0" });
@@ -298,9 +302,7 @@ function drawLegend(cat) {
   el.hidden = cat !== "upgrade";
   if (el.hidden || el.childElementCount) return;
   Object.keys(MOD_FLAGS).forEach((k, i) => {
-    const icon = h("span", { class: "mod-flag " + k });
-    icon.innerHTML = MOD_FLAGS[k].svg;
-    el.append(h("span", { class: "legend-item" }, icon, MOD_FLAGS[k].label));
+    el.append(h("span", { class: "legend-item" }, flagIcon(k), MOD_FLAGS[k].label));
   });
 }
 const pick = { cat: null, sub: null, items: [], shown: 0, filtered: [], multi: false, chosen: new Set() };
@@ -844,12 +846,12 @@ function locSearch(input, pick, maxLen) {
   input.addEventListener("blur", close);
   return box;
 }
-
-function leafWidget(sn, path, v, n) {
+function leafWidget(sn, path, v, n, mirror = []) {
   const spec = leafSpec(sn, path);
   const key = path.filter((p) => !isIdx(p)).pop();
   const set = (nv) => {
     const sides = record(sn, { t: "set", path, v: nv });
+    for (const mp of mirror) record(sn, { t: "set", path: mp, v: nv });
     for (const o of sides) if (o !== sn) syncSide(o);
     const s = ed.sides[sn];
     n.classList.toggle("mod", !hasAt(s.base, path) || !deepEq(getAt(s.base, path), nv));
@@ -963,7 +965,6 @@ function node(sn, path, v, flt = treeFilter) {
   const inherited = top && exists && !s.ownKeys.includes(k);
   const acts = h("span", { class: "acts" },
     inArr && isObj(v) ? h("button", { class: "btn-x", title: "Duplicate", onclick: () => { record(sn, { t: "dup", path }); refresh(); } }, "⧉") : null,
-    top && changed && exists ? h("button", { class: "btn-x", title: "Reset to original", onclick: () => resetKey(sn, k) }, "↺︎") : null,
     inherited && !isObj(v) ? null : h("button", {
       class: "btn-x", title: inherited ? "Empty this inherited value" : inArr ? "Remove item" : "Remove",
       onclick: () => {
@@ -972,7 +973,7 @@ function node(sn, path, v, flt = treeFilter) {
         else { record(sn, { t: "del", path }); refresh(); }
       },
     }, "×"));
-  const label = keyLabel(path, k, inArr, v);
+  const label = keyLabel(path, k, inArr, v, restoreDot(sn, path));
   if (isObj(v)) {
     const narrow = !!flt && !nameHit(k);
     const open = ed.open.has(id) || (narrow && !ed.closed.has(id) && deepHit(k, v));
@@ -1001,8 +1002,17 @@ function node(sn, path, v, flt = treeFilter) {
   return n;
 }
 
-function keyLabel(path, k, inArr, v) {
-  const el = h("span", { class: "k", title: path.join(".") });
+function restoreAt(sn, path, mirror = []) {
+  if (path.length === 1) { resetKey(sn, path[0]); return; }
+  for (const p of [path, ...mirror]) {
+    const base = ed.sides[sn].base;
+    record(sn, hasAt(base, p) ? { t: "set", path: p, v: clone(getAt(base, p)) } : { t: "del", path: p });
+  }
+  refresh();
+}
+const restoreDot = (sn, path, mirror) => h("button", { class: "dot-btn", type: "button", title: "Restore the original value", onclick: (e) => { e.stopPropagation(); restoreAt(sn, path, mirror); } });
+function keyLabel(path, k, inArr, v, dot) {
+  const el = h("span", { class: "k", title: path.join(".") }, dot);
   if (inArr) {
     const what = isObj(v) ? (v.UpgradeType ? statName(String(v.UpgradeType)) : v.ItemType ? tail(String(v.ItemType)) : null) : null;
     el.append(h("span", { class: "nm" }, "#" + (+k + 1) + (what ? " " + what : "")));
@@ -1058,12 +1068,82 @@ function renderSide(sn) {
     }),
     !keys.length && !removed.length ? h("div", { class: "empty" }, "No metadata found for this type.") : null);
 }
+const BASIC_GROUPS = new Set(["mod", "arcane", "suit", "weapon"]);
+const isAdvanced = () => !!store.get("advancedEditor");
+const useBasic = () => !isAdvanced() && BASIC_GROUPS.has(ed.group);
+const findKey = (obj, prefix) => (isObj(obj) ? Object.keys(obj).find((k) => k.startsWith(prefix) && isObj(obj[k])) : undefined);
+function basicLayout(e) {
+  const general = [["Name", ["LocalizeTag"]], ["Description", ["LocalizeDescTag"]], ["Icon", ["Icon"]]];
+  const slots = () => Array.isArray(e.ArtifactSlots) && groups.push(["Polarity slots", e.ArtifactSlots.map((_, i) => ["Slot " + (i + 1), ["ArtifactSlots", String(i)]])]);
+  const clean = (list) => list.filter(Boolean);
+  const groups = [];
+  if (ed.group === "mod" || ed.group === "arcane") {
+    general.push(["Rarity", ["Rarity"]]);
+    if (ed.group === "mod") general.push(["Polarity", ["ArtifactPolarity"]], ["Base drain", ["BaseDrain"]]);
+    general.push(["Max rank", ["FusionLimit"]], ["Compatible with", ["ItemCompatibility"]]);
+    if (ed.group === "arcane") general.push(["Effect duration (s)", ["UpgradeDuration"]]);
+    (Array.isArray(e.Upgrades) ? e.Upgrades : []).forEach((u, i) => {
+      if (!isObj(u)) return;
+      const at = (k) => ["Upgrades", String(i), k];
+      groups.push(["Stat " + (i + 1) + (u.UpgradeType ? ": " + statName(String(u.UpgradeType)) : ""),
+        [["Stat", at("UpgradeType")], "DamageType" in u && (u.DamageType !== "DT_ANY" || /DAMAGE_ADDED|PROC|ELEMENT|RESIST/.test(String(u.UpgradeType))) && ["Damage type", at("DamageType")], ["How it applies", at("OperationType")], ["Value per rank", at("Value")], ["Stat text", at("LocTag")]].filter(Boolean)]);
+    });
+  } else if (ed.group === "suit") {
+    general.push(["Passive description", ["PassiveAbilityLocTag"]], ["Health", ["MaxHealthOverride"]], ["Shields", ["MaxShieldOverride"]], ["Armor", ["ArmourRatingOverride"]], ["Max energy", ["MaxEnergy"]], ["Starting energy", ["InitialEnergy"]], ["Sprint speed", ["MovementSpeedMultiplier"]]);
+    slots();
+    if (Array.isArray(e.AbilityTypes)) groups.push(["Abilities", e.AbilityTypes.map((_, i) => ["Ability " + (i + 1), ["AbilityTypes", String(i)]])]);
+  } else if (ed.group === "weapon") {
+    const gun = Number(e.AmmoClipSize) > 0;
+    general.push(gun && ["Magazine size", ["AmmoClipSize"]], ["Mastery requirement", ["RequiredLevel"]]);
+    const modes = (Array.isArray(e.Behaviors) ? e.Behaviors : []).slice(0, e.AlternateFireDisabled ? 1 : undefined);
+    const STATS = [["Damage", "impact:", ["AttackData", "Amount"]], ["Status chance (1 = 100%)", "impact:", ["AttackData", "ProcChance"]], ["Critical chance (1 = 100%)", "impact:", ["criticalHitChance"]], ["Critical multiplier", "impact:", ["criticalHitDamageMultiplier"]], ["Multishot", "fire:", ["fireIterations"]], [gun ? "Fire rate" : "Attack speed", "state:", ["fireRate"]], ["Reload time (s)", "state:", ["reloadTime"]]];
+    const shared = [], per = modes.map(() => []);
+    for (const [label, prefix, rest] of STATS.filter(([l]) => gun || !/^(Multishot|Reload)/.test(l))) {
+      const paths = modes.map((b, i) => { const k = findKey(b, prefix); return k && hasAt(b[k], rest) ? ["Behaviors", String(i), k, ...rest] : null; });
+      const found = paths.filter(Boolean);
+      if (!found.length) continue;
+      if (found.every((p) => getAt(e, p) === getAt(e, found[0]))) shared.push([label, found[0], found.slice(1)]);
+      else paths.forEach((p, i) => p && per[i].push([label, p]));
+    }
+    if (shared.length) groups.push(["Stats", shared]);
+    slots();
+    per.forEach((rows, i) => rows.length && groups.push([i === 0 ? "Main attack" : i === 1 ? "Alternate fire" : "Attack " + (i + 1), rows]));
+  }
+  return [["General", clean(general)], ...groups];
+}
+function basicRow(sn, label, path, mirror) {
+  const s = ed.sides[sn];
+  const text = path.length === 1 && /^Localize(Desc)?Tag$/.test(path[0]);
+  if (!hasAt(s.edit, path) && !text) return null;
+  const v = hasAt(s.edit, path) ? getAt(s.edit, path) : "";
+  if (isObj(v)) return null;
+  const changed = !hasAt(s.base, path) ? v !== "" : !deepEq(getAt(s.base, path), v);
+  const n = h("div", { class: "node top" + (changed ? " mod" : "") });
+  n.append(h("div", { class: "line" }, h("span", { class: "tw" }), h("span", { class: "k", title: path.join(".") }, restoreDot(sn, path, mirror), h("span", { class: "nm" }, label)), leafWidget(sn, path, v, n, mirror), h("span", { class: "acts" })));
+  n.append(h("div", { class: "loc" }, typeof v === "string" && loc(v) && !n.dataset.shown ? "“" + loc(v) + "”" : ""));
+  return n;
+}
+function renderBasic(sn) {
+  const e = ed.sides[sn].edit;
+  const secs = basicLayout(e).map(([title, rows]) => {
+    const els = rows.map(([label, path, mirror]) => basicRow(sn, label, path, mirror)).filter(Boolean);
+    return els.length ? h("div", { class: "basic-group" }, h("div", { class: "sec-title" }, title), h("div", { class: "tree" }, els)) : null;
+  }).filter(Boolean);
+  return h("div", { class: "sec", "data-side": sn },
+    h("p", { class: "muted small basic-note" }, "The basic editor shows the most common fields. Tick Advanced editor to see and edit everything."),
+    secs.length ? secs : h("div", { class: "empty" }, "Nothing to edit here in the basic editor. Switch to the advanced editor to see every field."));
+}
 const syncSide = debounce((sn) => {
   const el = document.querySelector(`#sides .sec[data-side="${sn}"]`);
-  if (el && !el.contains(document.activeElement)) el.replaceWith(renderSide(sn));
+  if (el && !el.contains(document.activeElement)) el.replaceWith(useBasic() ? renderBasic(sn) : renderSide(sn));
 }, 150);
 
 function renderSides() {
+  const basic = useBasic();
+  $("#view-edit").classList.toggle("basic", basic);
+  $("#adv-toggle").checked = isAdvanced();
+  $("#adv-toggle").closest("label").hidden = !BASIC_GROUPS.has(ed.group);
+  if (basic) { $("#sides").replaceChildren(renderBasic(ed.multi ? "all" : "item")); return; }
   if (ed.multi) { $("#sides").replaceChildren(renderSide("all")); return; }
   $("#sides").replaceChildren(renderSide("item"), ed.showStore && ed.sides.store ? renderSide("store") : "");
 }
@@ -1334,6 +1414,7 @@ function initEditor() {
   $("#cond-ver").addEventListener("input", renderOutput);
   $("#also-store").addEventListener("change", (e) => { if (ed.multi) return; ed.showStore = e.target.checked && !!ed.sides?.store; renderSides(); saveDraft(); });
   $("#key-filter").addEventListener("input", debounce(() => { if (!ed?.sides) return; ed.closed.clear(); renderSides(); }, 120));
+  $("#adv-toggle").addEventListener("change", (e) => { store.set("advancedEditor", e.target.checked); if (ed?.sides) renderSides(); });
   $("#btn-fr").onclick = () => { $("#fr").hidden = !$("#fr").hidden; if (!$("#fr").hidden) $("#fr-from").focus(); };
   $("#fr-add").onclick = () => {
     const from = $("#fr-from").value, to = $("#fr-to").value;
@@ -1358,20 +1439,55 @@ function initEditor() {
     toast("Saved " + name + ".txt");
   };
 }
-function fillPathList(list, items, byName) {
-  for (const i of items) byName.set(i.name.toLowerCase(), i.path);
-  list.replaceChildren(...items.map((i) => h("option", { value: i.path }, i.name)));
+function namePaths(items, byName) {
+  const count = new Map();
+  for (const i of items) count.set(i.name.toLowerCase(), (count.get(i.name.toLowerCase()) || 0) + 1);
+  const named = items.map((i) => ({ path: i.path, flag: i.flag, shown: i.name, name: count.get(i.name.toLowerCase()) > 1 ? i.name + " (" + tail(i.path) + ")" : i.name }));
+  for (const i of named) byName.set(i.name.toLowerCase(), i.path);
+  return named;
+}
+function pathSearch(input, load) {
+  const box = h("div", { class: "sugg path-sugg", hidden: true });
+  input.after(box);
+  let data = null, items = [], sel = -1;
+  const close = () => { box.hidden = true; sel = -1; };
+  const mark = () => items.forEach((b, i) => b.classList.toggle("sel", i === sel));
+  const pick = (i) => { input.value = i.name; close(); input.dispatchEvent(new Event("change")); };
+  input.addEventListener("focus", async () => { data ||= await load(); });
+  input.addEventListener("input", debounce(async () => {
+    const q = input.value.trim().toLowerCase();
+    data ||= await load();
+    const hits = q.length < 2 ? [] : data.map((i) => {
+      const n = i.name.toLowerCase(), at = n.indexOf(q);
+      const rank = n === q ? 0 : at === 0 ? 1 : at > 0 ? 2 : i.path.toLowerCase().includes(q) ? 3 : -1;
+      return [rank, i];
+    }).filter(([r]) => r >= 0).sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length).slice(0, 12);
+    items = hits.map(([, i]) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); pick(i); } }, h("span", { class: "pn" }, i.shown || i.name, i.flag ? flagIcon(i.flag) : null), h("span", { class: "pp" }, i.path.replace(/^\/Lotus\//, ""))));
+    box.replaceChildren(...items);
+    box.hidden = !items.length;
+    sel = -1;
+  }, 120));
+  input.addEventListener("keydown", (e) => {
+    if (box.hidden) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      sel = Math.max(0, Math.min(items.length - 1, sel + (e.key === "ArrowDown" ? 1 : -1)));
+      mark();
+      items[sel]?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter" && sel >= 0) {
+      e.preventDefault();
+      items[sel].dispatchEvent(new MouseEvent("mousedown"));
+    } else if (e.key === "Escape") close();
+  });
+  input.addEventListener("blur", close);
 }
 function initEye() {
   const input = $("#eye-path"), np = $("#eye-newpath"), status = $("#eye-status");
   const byName = new Map();
-  let filled = false;
-  input.addEventListener("focus", async () => {
-    if (filled) return;
-    filled = true;
+  pathSearch(input, async () => {
     const [lists, customs, chars] = await Promise.all([loadAllLists(), loadCustoms(), loadCharacters()]);
     const seen = new Set();
-    fillPathList($("#eye-list"), lists.concat(customs, chars.all.map((c) => ({ path: c.path, name: c.label || c.name }))).filter((i) => !seen.has(i.path) && seen.add(i.path)), byName);
+    return namePaths(lists.concat(customs, chars.all.map((c) => ({ path: c.path, name: c.label || c.name }))).filter((i) => !seen.has(i.path) && seen.add(i.path)), byName);
   });
   const mode = () => document.querySelector('input[name="eye-mode"]:checked').value;
   const resolve = () => byName.get(input.value.trim().toLowerCase()) || normalizePath(input.value);
@@ -1407,14 +1523,10 @@ function normalizePath(raw) {
 function initBlank() {
   const form = $("#blank-form"), input = $("#blank-path");
   const byName = new Map();
-  let suggested = false;
+  pathSearch(input, async () => namePaths(await loadAllLists(), byName));
   $("#btn-blank").onclick = () => {
     form.hidden = !form.hidden;
-    if (form.hidden) return;
-    input.focus();
-    if (suggested) return;
-    suggested = true;
-    loadAllLists().then((all) => fillPathList($("#blank-list"), all, byName));
+    if (!form.hidden) input.focus();
   };
   form.onsubmit = async (e) => {
     e.preventDefault();

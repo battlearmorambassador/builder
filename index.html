@@ -37,8 +37,7 @@
     <div class="blank">
       <button class="btn btn-primary start" id="btn-blank">Blank patch</button>
       <form class="blank-form" id="blank-form" hidden>
-        <input class="input" id="blank-path" list="blank-list" placeholder="/Lotus/Weapons/Tenno/Melee/Swords/KatanaAndWakizashi/Katana" spellcheck="false" autocomplete="off">
-        <datalist id="blank-list"></datalist>
+        <div class="path-w"><input class="input" id="blank-path" placeholder="/Lotus/Weapons/Tenno/Melee/Swords/KatanaAndWakizashi/Katana" spellcheck="false" autocomplete="off"></div>
         <button class="btn btn-primary" type="submit">Open</button>
         <div class="muted small" id="blank-status">Type or paste any path or item name. You can also use <a href="https://browse.wf/" target="_blank" rel="noopener">https://browse.wf/</a></div>
       </form>
@@ -53,8 +52,7 @@
   </header>
   <form class="eye-inner" id="eye-form">
     <label class="label" for="eye-path">Item</label>
-    <input class="input" id="eye-path" list="eye-list" placeholder="Search by name or paste a path, e.g. /Lotus/Powersuits/Stalker/Stalker" spellcheck="false" autocomplete="off">
-    <datalist id="eye-list"></datalist>
+    <div class="path-w"><input class="input" id="eye-path" placeholder="Search by name or paste a path, e.g. /Lotus/Powersuits/Stalker/Stalker" spellcheck="false" autocomplete="off"></div>
     <div class="eye-modes">
       <label class="check"><input type="radio" name="eye-mode" value="asis" checked> <span>Make it obtainable as it is</span></label>
       <label class="check"><input type="radio" name="eye-mode" value="new"> <span>Create a new item based on it</span></label>
@@ -193,6 +191,7 @@
       <div class="pane-head">
         <span>Metadata</span>
         <div class="tools">
+          <label class="check small"><input type="checkbox" id="adv-toggle"> <span>Advanced editor</span></label>
           <input id="key-filter" class="input mini" type="search" placeholder="Filter keys…" autocomplete="off" spellcheck="false">
           <button class="btn btn-ghost" id="btn-fr">Find &amp; replace</button>
         </div>
