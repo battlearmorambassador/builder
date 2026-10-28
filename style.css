@@ -97,7 +97,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .pick-legend { display: flex; align-items: center; gap: 20px; color: var(--dim); font-size: 14px; }
 .legend-item { display: flex; align-items: center; gap: 8px; }
 .legend-item .mod-flag { flex: none; width: 20px; }
-#view-edit { display: flex; flex-direction: column; min-height: 100vh; }
+#view-edit, #view-skin { display: flex; flex-direction: column; min-height: 100vh; }
 .edit-head, .check-head { max-width: 1400px; width: 100%; margin: 0 auto; padding: 24px 24px 8px; }
 .check-head { padding: 28px 24px 0; }
 #patch-name { max-width: 420px; }
@@ -222,6 +222,10 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .eye-field { display: flex; flex-direction: column; }
 .eye-note { align-self: end; padding-bottom: 6px; }
 .eye-panel p { margin: 0; }
+.skin-form { padding: 14px; display: flex; flex-direction: column; gap: 16px; }
+.skin-form .input { max-width: 420px; }
+.skin-list { display: flex; flex-direction: column; gap: 8px; }
+.skin-form p { margin: 0; }
 .eye-more summary { cursor: pointer; color: var(--dim); font-size: 14px; }
 .eye-more[open] summary { margin-bottom: 10px; }
 @media (max-width: 900px) {

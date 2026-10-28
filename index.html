@@ -58,6 +58,7 @@
     <div class="eye-modes">
       <label class="check"><input type="radio" name="eye-mode" value="asis" checked> <span>Make it obtainable as it is</span></label>
       <label class="check"><input type="radio" name="eye-mode" value="new"> <span>Create a new item based on it</span></label>
+      <label class="check"><input type="radio" name="eye-mode" value="skin"> <span>Create a skin from a character</span></label>
     </div>
     <div id="eye-new" hidden>
       <label class="label" for="eye-newpath">New item path</label>
@@ -65,6 +66,39 @@
     </div>
     <div class="eye-actions"><button class="btn btn-primary start" type="submit">Continue</button><span class="muted small" id="eye-status"></span></div>
   </form>
+</section>
+<section id="view-skin" class="view" hidden>
+  <header class="bar">
+    <a href="#/" class="brand">Metadata Patch Builder</a>
+    <nav class="bar-center"><a class="navlink" href="#/eye">Sentient Builder</a><a class="navlink" href="#/check">Check my patch</a></nav>
+    <span></span>
+  </header>
+  <div class="edit-head">
+    <div class="target">
+      <img id="skin-icon" alt="">
+      <div>
+        <strong id="skin-title"></strong>
+        <code id="skin-path"></code>
+      </div>
+    </div>
+  </div>
+  <div class="edit-body">
+    <div class="pane">
+      <div class="pane-head"><span>Skin</span></div>
+      <div class="skin-form" id="skin-form"></div>
+    </div>
+    <div class="pane">
+      <div class="pane-head">
+        <span>Output</span>
+        <button class="btn btn-ghost" id="skin-copy">Copy</button>
+      </div>
+      <pre id="skin-output" class="output"></pre>
+    </div>
+  </div>
+  <footer class="edit-foot">
+    <span class="muted small">Drop the file into <code>OpenWF/Metadata Patches/</code> and restart the game.</span>
+    <button class="btn btn-primary" id="skin-save">Save metadata</button>
+  </footer>
 </section>
 <section id="view-check" class="view" hidden>
   <header class="bar">

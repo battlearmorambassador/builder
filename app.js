@@ -1369,8 +1369,9 @@ function initEye() {
   input.addEventListener("focus", async () => {
     if (filled) return;
     filled = true;
-    const [lists, customs] = await Promise.all([loadAllLists(), loadCustoms()]);
-    fillPathList($("#eye-list"), lists.concat(customs), byName);
+    const [lists, customs, chars] = await Promise.all([loadAllLists(), loadCustoms(), loadCharacters()]);
+    const seen = new Set();
+    fillPathList($("#eye-list"), lists.concat(customs, chars.all.map((c) => ({ path: c.path, name: c.label || c.name }))).filter((i) => !seen.has(i.path) && seen.add(i.path)), byName);
   });
   const mode = () => document.querySelector('input[name="eye-mode"]:checked').value;
   const resolve = () => byName.get(input.value.trim().toLowerCase()) || normalizePath(input.value);
@@ -1388,6 +1389,7 @@ function initEye() {
     status.innerHTML = '<span class="spinner"></span>Looking up ' + esc(target) + "…";
     if (!(await loadType(target))) { status.textContent = target + " was not found in warframe-packages-bin-data."; return; }
     if (mode() === "asis") { status.textContent = ""; location.hash = "#/edit?eye=asis&p=" + encodeURIComponent(target); return; }
+    if (mode() === "skin") { status.textContent = ""; location.hash = "#/skin?p=" + encodeURIComponent(target); return; }
     const newPath = normalizePath(np.value);
     if (!newPath || newPath === target) { status.textContent = "Give the new item its own path."; return; }
     if (await loadType(newPath)) { status.textContent = newPath + " already exists. Pick another path, or use \"Make it obtainable as it is\"."; return; }
@@ -1748,12 +1750,167 @@ function initCheck() {
   });
   draw([], false);
 }
-
+const ALL_SUITS = "/Lotus/Types/Game/PowerSuit";
+const SKIN_DIR = "/Lotus/Upgrades/Skins/Custom/";
+const SKIN_STORE_DIR = "/Lotus/StoreItems/Upgrades/Skins/Custom/";
+const CUSTOMIZATION = "/Lotus/Types/Game/LotusWarframeCustomization";
+const CUSTOMIZATION_STORE = "/Lotus/Types/Game/StoreItemSpecializations/LotusSuitCustomizationStoreItem";
+let charsPromise = null;
+function loadCharacters() {
+  if (!charsPromise) charsPromise = Promise.all([getJSON(`${PEP}/ExportWarframes.json`), getJSON(`${PEP}/ExportEnemies.json`), loadDict()]).then(([w, e]) => {
+    const suits = Object.entries(w).map(([path, x]) => ({ path, name: cleanName(x.name, path), icon: x.icon, suit: x.productCategory === "Suits" }));
+    const npcs = Object.entries(e.avatars || {}).map(([path, x]) => ({ path, name: cleanName(x.name, path), icon: x.icon }));
+    const seen = new Map();
+    for (const c of npcs) seen.set(c.name, (seen.get(c.name) || 0) + 1);
+    for (const c of npcs) c.label = seen.get(c.name) > 1 ? c.name + " (" + tail(c.path) + ")" : c.name;
+    return { suits: suits.filter((s) => s.suit).sort((a, b) => a.name.localeCompare(b.name)), all: suits.concat(npcs) };
+  }).catch(() => ({ suits: [], all: [] }));
+  return charsPromise;
+}
+const relTo = (base, v) => (typeof v === "string" && v && !v.startsWith("/") ? base.slice(0, base.lastIndexOf("/") + 1) + v : v);
+const isFx = (type) => /\/Fx\//.test(type) || /Smoke|Spark|Glow|Trail|Fx/i.test(tail(type));
+const rgbOf = (c) => (Array.isArray(c) && c.length >= 3 ? c.slice(0, 3).map(Number) : null);
+const hueOf = (c) => { const v = rgbOf(c); return v ? v.indexOf(Math.max(...v)) : -1; };
+const glowFrom = (rgb) => {
+  const m = Math.max(...rgb) || 1, hi = rgb.map((x) => +(x / m).toFixed(4));
+  return { hi: [...hi, 1], lo: [...hi.map((x) => +(x * 0.2).toFixed(4)), 1] };
+};
+async function analyzeCharacter(path) {
+  const t = await loadType(path);
+  if (!t) return { error: path + " was not found in warframe-packages-bin-data." };
+  const d = t.data, at = (k) => t.origin[k] || path;
+  if (!d.Mesh) return { error: "This character has no body of its own, so it can't be turned into a skin." };
+  const matKey = d.OverrideMaterials ? "OverrideMaterials" : "OverrideMaterial";
+  const mats = (d[matKey] || []).map((m) => relTo(at(matKey), m));
+  const children = (d.AutoSimChildren || []).map((c) => ({ ...c, Type: relTo(at("AutoSimChildren"), c.Type) }));
+  let head = [];
+  const helmetType = d.DefaultCustomization?.Helmet?.ItemType;
+  if (helmetType) {
+    const hp = relTo(at("DefaultCustomization"), helmetType);
+    const ht = await loadType(hp);
+    const kids = ht?.data.THIRD_PERSON_Attachment?.UpgradeAutoChildren || [];
+    head = kids.map((c) => ({ ...c, Type: relTo(ht.origin.THIRD_PERSON_Attachment || hp, c.Type) }));
+  }
+  if (!head.length) head = children.filter((c) => /Helmet|Head|Mask/i.test(tail(c.Type)));
+  const parts = children.filter((c) => !head.includes(c));
+  const color = d.DefaultEnergyColor || d.ScriptInstance?._newEnergyColor || null;
+  const scriptColor = !d.DefaultEnergyColor && !!d.ScriptInstance?._newEnergyColor;
+  let fix = null, note = "";
+  if (mats[0] && rgbOf(color)) {
+    const mt = await loadType(mats[0]);
+    const glow = mt?.data["PS:EmissiveTintColorHi"];
+    const own = !!mt && "PS:EmissiveTintColorHi" in mt.own;
+    if (glow && hueOf(glow) !== hueOf(color)) {
+      if (own && scriptColor) note = "Its energy colour is set by a fight script, not by its material, so the skin keeps the material's own glow colour.";
+      else fix = { material: mats[0], ...glowFrom(rgbOf(color)) };
+    }
+  }
+  const name = loc(d.LocalizeTag) || loc(d.LocTag) || tail(path);
+  return { path, name: name.replace(/<[^>]+>\s*/g, ""), icon: d.Icon || "", mesh: d.Mesh, mats, head, parts, fix, note };
+}
+let sk = null;
+async function showSkin(path) {
+  sk = { path, info: null, name: "", target: ALL_SUITS, helmet: true, picked: new Set() };
+  $("#skin-title").textContent = tail(path);
+  $("#skin-path").textContent = path;
+  $("#skin-icon").removeAttribute("src");
+  $("#skin-output").innerHTML = "";
+  $("#skin-form").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), "Reading the character from warframe-packages-bin-data…"));
+  const [info, chars] = await Promise.all([analyzeCharacter(path), loadCharacters(), loadDict().catch(() => null)]);
+  if (!sk || sk.path !== path) return;
+  if (info.error) { $("#skin-form").replaceChildren(h("div", { class: "empty" }, info.error)); return; }
+  const known = chars.all.find((c) => c.path === path);
+  info.name = known?.name || info.name;
+  info.icon = known?.icon || info.icon;
+  sk.info = info;
+  sk.name = info.name + " Skin";
+  sk.helmet = info.head.length > 0;
+  info.parts.forEach((c, i) => { if (!isFx(c.Type)) sk.picked.add(i); });
+  $("#skin-title").textContent = info.name;
+  if (info.icon) { $("#skin-icon").style.visibility = ""; $("#skin-icon").onerror = hideBroken; $("#skin-icon").src = IMG + info.icon; }
+  drawSkinForm(chars.suits);
+  renderSkin();
+}
+function drawSkinForm(suits) {
+  const info = sk.info;
+  const name = h("input", { class: "input", value: sk.name, spellcheck: "false", autocomplete: "off" });
+  name.addEventListener("input", () => { sk.name = name.value; renderSkin(); });
+  const target = h("select", { class: "input" }, h("option", { value: ALL_SUITS }, "Every Warframe"), suits.map((s) => h("option", { value: s.path }, s.name)));
+  target.addEventListener("change", () => { sk.target = target.value; renderSkin(); });
+  const check = (label, on, set) => {
+    const box = h("input", { type: "checkbox", checked: on });
+    box.addEventListener("change", () => { set(box.checked); renderSkin(); });
+    return h("label", { class: "check" }, box, h("span", {}, label));
+  };
+  const partName = (c) => {
+    const what = humanize(tail(c.Type).replace(/(Deco|NPC|Cloth)+$/g, ""));
+    const b = String(c.BoneName || ""), side = /_L\d_/.test(b) ? "Left " : /_R\d_/.test(b) ? "Right " : "";
+    const where = /CHEST/.test(b) ? "Chest" : /LEG|KNEE|THIGH|FOOT/.test(b) ? side + "leg" : /TWIST|ARM|SHOULDER|CLAVICLE|HAND/.test(b) ? side + "arm" : /SPINE|BACK/.test(b) ? "Back" : /HEAD|NECK/.test(b) ? "Head" : "";
+    return where ? where.charAt(0).toUpperCase() + where.slice(1) + " piece (" + what + ")" : what;
+  };
+  $("#skin-form").replaceChildren(...[
+    h("label", { class: "eye-field" }, h("span", { class: "label" }, "Skin name"), name),
+    h("label", { class: "eye-field" }, h("span", { class: "label" }, "Who can wear it"), target),
+    h("div", { class: "skin-list" }, h("span", { class: "label" }, "Head"),
+      info.head.length ? check("Include the " + info.name + " helmet", sk.helmet, (v) => (sk.helmet = v)) : h("span", { class: "muted small" }, "This character has no separate head piece.")),
+    info.parts.length ? h("div", { class: "skin-list" }, h("span", { class: "label" }, "Attachments"),
+      info.parts.map((c, i) => check(partName(c) + (isFx(c.Type) ? " (effect)" : ""), sk.picked.has(i), (v) => (v ? sk.picked.add(i) : sk.picked.delete(i))))) : null,
+    info.fix ? h("p", { class: "muted small" }, "The body material inherits a different glow colour, so the patch also sets the right one on ", h("code", {}, tail(info.fix.material)), ". Only things that use this material are affected.") : null,
+    info.note ? h("p", { class: "warn" }, info.note) : null].filter(Boolean));
+}
+function buildSkin() {
+  const info = sk.info, all = sk.target === ALL_SUITS;
+  const label = sk.name.trim() || info.name + " Skin";
+  const key = label.replace(/[^A-Za-z0-9]/g, "") || "CustomSkin";
+  const vp = SKIN_DIR + key + "Variant", sp = SKIN_DIR + key, hp = SKIN_DIR + key + "Helmet";
+  const ssp = SKIN_STORE_DIR + key, shp = SKIN_STORE_DIR + key + "Helmet";
+  const who = all ? [["Weapon", ALL_SUITS], ["GenericCompatible", ALL_SUITS]] : [["Weapon", sk.target]];
+  const block = (head, fields) => [head, ...fields.filter(Boolean).map(([k, v]) => indent(k + "=" + (typeof v === "string" && v.startsWith("/") ? v : eeValue(v))))];
+  const store = (path, type, name, extra = []) => block(`+${path}|${CUSTOMIZATION_STORE}`, [["ProductCategory", "WeaponSkins"], ["LocalizeTag", name], info.icon && ["Icon", info.icon], ["TypeName", type], ["Compatible", sk.target], ["AlwaysAvailable", 1], ["ShowInMarket", 0], ["Giftable", 0], ["AvailableOnPvp", 1], ...extra]);
+  const blocks = [block(`+${vp}|/EE/Types/Game/WeaponSkin`, [["TpMeshOverride", info.mesh], info.mats.length && ["TpMaterialOverrides", info.mats]])];
+  const helmet = sk.helmet && info.head.length > 0;
+  const helmetName = label.replace(/\s*Skin$/i, "") + " Helmet";
+  if (helmet) {
+    blocks.push(block(`+${hp}|${CUSTOMIZATION}`, [["LocalizeTag", helmetName], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["ExcludeFromCodex", 0], ...who, ["THIRD_PERSON_Attachment", { UpgradeAutoChildren: info.head }]]));
+    blocks.push(store(shp, hp, helmetName, [["ExcludeFromCodex", 0]]));
+  }
+  blocks.push(block(`+${sp}|${CUSTOMIZATION}`, [["LocalizeTag", label], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ...who, ["UpgradeSkinOverride", vp], ["CompatibleSlots", ["BodySkin"]], ["AllowUglyMode", 1], helmet && ["ForcedCustomizations", { Helmet: hp }], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", info.parts.filter((_, i) => sk.picked.has(i))]]));
+  blocks.push(store(ssp, sp, label, [["CompatibleSlots", ["BodySkin"]]]));
+  blocks.push([">" + MANIFEST, indent("a|StoreItems|" + ssp), ...(helmet ? [indent("a|StoreItems|" + shp)] : [])]);
+  const out = ["# " + label, "$if can_add_new_types()"];
+  blocks.forEach((b) => out.push("", ...b));
+  out.push("$endif");
+  if (info.fix) out.push("", ">" + info.fix.material, indent("PS:EmissiveTintColorLo=" + eeValue(info.fix.lo)), indent("PS:EmissiveTintColorHi=" + eeValue(info.fix.hi)));
+  return out.join("\n") + "\n";
+}
+function renderSkin() {
+  if (sk?.info) $("#skin-output").innerHTML = highlight(buildSkin());
+}
+function initSkin() {
+  $("#skin-copy").onclick = async () => {
+    if (!sk?.info) return;
+    try { await navigator.clipboard.writeText(buildSkin()); toast("Copied"); } catch { toast("Copy failed"); }
+  };
+  $("#skin-save").onclick = () => {
+    if (!sk?.info) return;
+    const name = (sk.name || "Skin").replace(/[\\/:*?"<>|]+/g, "_").trim() || "Skin";
+    const url = URL.createObjectURL(new Blob([buildSkin()], { type: "text/plain" }));
+    h("a", { href: url, download: name + ".txt" }).click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast("Saved " + name + ".txt");
+  };
+}
 function route() {
   const hash = location.hash || "#/";
   const show = (id) => { for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== id; };
   closeAddMenu();
-  if (hash === "#/eye") {
+  if (hash.startsWith("#/skin")) {
+    const p = new URLSearchParams(hash.split("?")[1] || "").get("p");
+    if (!p?.startsWith("/Lotus/")) { location.hash = "#/eye"; return; }
+    show("view-skin");
+    window.scrollTo(0, 0);
+    showSkin(p);
+  } else if (hash === "#/eye") {
     show("view-eye");
     $("#eye-path").focus();
   } else if (hash === "#/check") {
@@ -1783,6 +1940,7 @@ initHome();
 initEditor();
 initBlank();
 initEye();
+initSkin();
 initMulti();
 initCheck();
 $("#cats").addEventListener("click", (e) => { if (e.target.dataset.cat) location.hash = "#/pick/" + e.target.dataset.cat; });
