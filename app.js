@@ -1920,23 +1920,75 @@ async function analyzeCharacter(path) {
   const name = loc(d.LocalizeTag) || loc(d.LocTag) || tail(path);
   return { path, name: name.replace(/<[^>]+>\s*/g, ""), icon: d.Icon || "", mesh: d.Mesh, mats, head, parts, fix, note };
 }
+const WEAPON_ROOTS = { LotusLongGun: "Every primary weapon", LotusPistol: "Every secondary weapon", PlayerMeleeWeapon: "Every melee weapon" };
+const WEAPON_SKIN = "/Lotus/Types/Game/LotusWeaponCustomization";
+async function analyzeWeapon(path) {
+  const t = await loadType(path);
+  if (!t) return { error: path + " was not found in warframe-packages-bin-data." };
+  if (!t.data.PickUpMesh) return { error: "This weapon has no model listed in its data, so it can't be turned into a skin." };
+  const item = (await loadList("weapon").catch(() => [])).find((i) => i.path === path);
+  return {
+    kind: "weapon", path, name: item?.name || tail(path), icon: item?.icon || t.data.Icon || "",
+    mesh: relTo(t.origin.PickUpMesh || path, t.data.PickUpMesh),
+    root: t.parents.find((p) => tail(p) in WEAPON_ROOTS), category: item?.raw.productCategory,
+  };
+}
+function drawWeaponSkinForm(weapons) {
+  const info = sk.info;
+  const name = h("input", { class: "input", value: sk.name, spellcheck: "false", autocomplete: "off" });
+  name.addEventListener("input", () => { sk.name = name.value; renderSkin(); });
+  const opt = (value, label) => h("option", { value, selected: value === sk.target }, label);
+  const target = h("select", { class: "input" },
+    info.root ? opt(info.root, WEAPON_ROOTS[tail(info.root)]) : null,
+    h("optgroup", { label: "One weapon" }, weapons.map((w) => opt(w.path, w.name))));
+  target.addEventListener("change", () => { sk.target = target.value; renderSkin(); });
+  $("#skin-form").replaceChildren(
+    h("label", { class: "eye-field" }, h("span", { class: "label" }, "Skin name"), name),
+    h("label", { class: "eye-field" }, h("span", { class: "label" }, "Who can use it"), target),
+    h("p", { class: "muted small" }, "The skin shows the " + info.name + " model. The grip and animations still come from the weapon wearing it, so very different weapons may hold it oddly."));
+}
+function buildWeaponSkin() {
+  const info = sk.info;
+  const label = sk.name.trim() || info.name + " Skin";
+  const key = label.replace(/[^A-Za-z0-9]/g, "") || "CustomWeaponSkin";
+  const sp = SKIN_DIR + key, ssp = SKIN_STORE_DIR + key;
+  const lines = (fields) => fields.filter(Boolean).map(([k, v]) => indent(k + "=" + (typeof v === "string" && v.startsWith("/") ? v : eeValue(v))));
+  const out = ["# " + label, "$if can_add_new_types()", "",
+    `+${sp}|${WEAPON_SKIN}`, ...lines([["LocalizeTag", label], info.icon && ["Icon", info.icon], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["AvailableOnPvp", 1], ["Weapon", sk.target], ["THIRD_PERSON_MeshOverride", info.mesh]]), "",
+    `+${ssp}|${CUSTOMIZATION_STORE}`, ...lines([["ProductCategory", "WeaponSkins"], ["LocalizeTag", label], info.icon && ["Icon", info.icon], ["TypeName", sp], ["Compatible", sk.target], ["AlwaysAvailable", 1], ["ShowInMarket", 1], ["RegularPrice", 1], ["Giftable", 0], ["AvailableOnPvp", 1]]), "",
+    ">" + MANIFEST, indent("a|StoreItems|" + ssp), "$endif"];
+  return out.join("\n") + "\n";
+}
 let sk = null;
 async function showSkin(path) {
-  sk = { path, info: null, name: "", target: ALL_SUITS, helmet: true, picked: new Set() };
+  sk = { path, info: null, name: "", target: ALL_SUITS, parts: "both", picked: new Set() };
   $("#skin-title").textContent = tail(path);
   $("#skin-path").textContent = path;
   $("#skin-icon").removeAttribute("src");
   $("#skin-output").innerHTML = "";
-  $("#skin-form").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), "Reading the character from warframe-packages-bin-data…"));
-  const [info, chars] = await Promise.all([analyzeCharacter(path), loadCharacters(), loadDict().catch(() => null)]);
+  $("#skin-form").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), "Reading it from warframe-packages-bin-data…"));
+  const weapon = path.startsWith("/Lotus/Weapons/");
+  const [info, chars] = await Promise.all([weapon ? analyzeWeapon(path) : analyzeCharacter(path), loadCharacters(), loadDict().catch(() => null)]);
   if (!sk || sk.path !== path) return;
   if (info.error) { $("#skin-form").replaceChildren(h("div", { class: "empty" }, info.error)); return; }
+  if (weapon) {
+    sk.info = info;
+    sk.name = info.name + " Skin";
+    sk.target = info.root || path;
+    $("#skin-title").textContent = info.name;
+    if (info.icon) { $("#skin-icon").style.visibility = ""; $("#skin-icon").onerror = hideBroken; $("#skin-icon").src = IMG + info.icon; }
+    const all = await loadList("weapon").catch(() => []);
+    if (!sk || sk.path !== path) return;
+    drawWeaponSkinForm(all.filter((w) => w.raw.productCategory === info.category));
+    renderSkin();
+    return;
+  }
   const known = chars.all.find((c) => c.path === path);
   info.name = known?.name || info.name;
   info.icon = known?.icon || info.icon;
   sk.info = info;
   sk.name = info.name + " Skin";
-  sk.helmet = info.head.length > 0;
+  sk.parts = info.head.length ? "both" : "body";
   info.parts.forEach((c, i) => { if (!isFx(c.Type)) sk.picked.add(i); });
   $("#skin-title").textContent = info.name;
   if (info.icon) { $("#skin-icon").style.visibility = ""; $("#skin-icon").onerror = hideBroken; $("#skin-icon").src = IMG + info.icon; }
@@ -1947,7 +1999,7 @@ function drawSkinForm(suits) {
   const info = sk.info;
   const name = h("input", { class: "input", value: sk.name, spellcheck: "false", autocomplete: "off" });
   name.addEventListener("input", () => { sk.name = name.value; renderSkin(); });
-  const target = h("select", { class: "input" }, h("option", { value: ALL_SUITS }, "Every Warframe"), suits.map((s) => h("option", { value: s.path }, s.name)));
+  const target = h("select", { class: "input" }, h("option", { value: ALL_SUITS }, "Every Warframe"), suits.map((s) => h("option", { value: s.path, selected: s.path === sk.target }, s.name)));
   target.addEventListener("change", () => { sk.target = target.value; renderSkin(); });
   const check = (label, on, set) => {
     const box = h("input", { type: "checkbox", checked: on });
@@ -1963,14 +2015,19 @@ function drawSkinForm(suits) {
   $("#skin-form").replaceChildren(...[
     h("label", { class: "eye-field" }, h("span", { class: "label" }, "Skin name"), name),
     h("label", { class: "eye-field" }, h("span", { class: "label" }, "Who can wear it"), target),
-    h("div", { class: "skin-list" }, h("span", { class: "label" }, "Head"),
-      info.head.length ? check("Include the " + info.name + " helmet", sk.helmet, (v) => (sk.helmet = v)) : h("span", { class: "muted small" }, "This character has no separate head piece.")),
-    info.parts.length ? h("div", { class: "skin-list" }, h("span", { class: "label" }, "Attachments"),
+    h("div", { class: "skin-list" }, h("span", { class: "label" }, "What to include"),
+      info.head.length ? [["both", "Body and helmet"], ["body", "Body only"], ["helmet", "Helmet only"]].map(([v, l]) => {
+        const r = h("input", { type: "radio", name: "skin-parts", value: v, checked: sk.parts === v });
+        r.addEventListener("change", () => { sk.parts = v; drawSkinForm(suits); renderSkin(); });
+        return h("label", { class: "check" }, r, h("span", {}, l));
+      }) : h("span", { class: "muted small" }, "Body only. This character has no separate head piece.")),
+    info.parts.length && sk.parts !== "helmet" ? h("div", { class: "skin-list" }, h("span", { class: "label" }, "Attachments"),
       info.parts.map((c, i) => check(partName(c) + (isFx(c.Type) ? " (effect)" : ""), sk.picked.has(i), (v) => (v ? sk.picked.add(i) : sk.picked.delete(i))))) : null,
-    info.fix ? h("p", { class: "muted small" }, "The body material inherits a different glow colour, so the patch also sets the right one on ", h("code", {}, tail(info.fix.material)), ". Only things that use this material are affected.") : null,
-    info.note ? h("p", { class: "warn" }, info.note) : null].filter(Boolean));
+    info.fix && sk.parts !== "helmet" ? h("p", { class: "muted small" }, "The body material inherits a different glow colour, so the patch also sets the right one on ", h("code", {}, tail(info.fix.material)), ". Only things that use this material are affected.") : null,
+    info.note && sk.parts !== "helmet" ? h("p", { class: "warn" }, info.note) : null].filter(Boolean));
 }
 function buildSkin() {
+  if (sk.info.kind === "weapon") return buildWeaponSkin();
   const info = sk.info, all = sk.target === ALL_SUITS;
   const label = sk.name.trim() || info.name + " Skin";
   const key = label.replace(/[^A-Za-z0-9]/g, "") || "CustomSkin";
@@ -1978,21 +2035,22 @@ function buildSkin() {
   const ssp = SKIN_STORE_DIR + key, shp = SKIN_STORE_DIR + key + "Helmet";
   const who = all ? [["Weapon", ALL_SUITS], ["GenericCompatible", ALL_SUITS]] : [["Weapon", sk.target]];
   const block = (head, fields) => [head, ...fields.filter(Boolean).map(([k, v]) => indent(k + "=" + (typeof v === "string" && v.startsWith("/") ? v : eeValue(v))))];
-  const store = (path, type, name, extra = []) => block(`+${path}|${CUSTOMIZATION_STORE}`, [["ProductCategory", "WeaponSkins"], ["LocalizeTag", name], info.icon && ["Icon", info.icon], ["TypeName", type], ["Compatible", sk.target], ["AlwaysAvailable", 1], ["ShowInMarket", 0], ["Giftable", 0], ["AvailableOnPvp", 1], ...extra]);
-  const blocks = [block(`+${vp}|/EE/Types/Game/WeaponSkin`, [["TpMeshOverride", info.mesh], info.mats.length && ["TpMaterialOverrides", info.mats]])];
-  const helmet = sk.helmet && info.head.length > 0;
+  const store = (path, type, name, extra = []) => block(`+${path}|${CUSTOMIZATION_STORE}`, [["ProductCategory", "WeaponSkins"], ["LocalizeTag", name], info.icon && ["Icon", info.icon], ["TypeName", type], ["Compatible", sk.target], ["AlwaysAvailable", 1], ["ShowInMarket", 1], ["RegularPrice", 1], ["Giftable", 0], ["AvailableOnPvp", 1], ...extra]);
+  const body = sk.parts !== "helmet";
+  const helmet = sk.parts !== "body" && info.head.length > 0;
+  const blocks = body ? [block(`+${vp}|/EE/Types/Game/WeaponSkin`, [["TpMeshOverride", info.mesh], info.mats.length && ["TpMaterialOverrides", info.mats]])] : [];
   const helmetName = label.replace(/\s*Skin$/i, "") + " Helmet";
   if (helmet) {
-    blocks.push(block(`+${hp}|${CUSTOMIZATION}`, [["LocalizeTag", helmetName], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["ExcludeFromCodex", 0], ...who, ["THIRD_PERSON_Attachment", { UpgradeAutoChildren: info.head }]]));
+    blocks.push(block(`+${hp}|${CUSTOMIZATION}`, [["LocalizeTag", helmetName], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["ExcludeFromCodex", 0], ...who, ["THIRD_PERSON_Attachment", { UpgradeAutoChildren: info.head }]]));
     blocks.push(store(shp, hp, helmetName, [["ExcludeFromCodex", 0]]));
   }
-  blocks.push(block(`+${sp}|${CUSTOMIZATION}`, [["LocalizeTag", label], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ...who, ["UpgradeSkinOverride", vp], ["CompatibleSlots", ["BodySkin"]], ["AllowUglyMode", 1], helmet && ["ForcedCustomizations", { Helmet: hp }], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", info.parts.filter((_, i) => sk.picked.has(i))]]));
-  blocks.push(store(ssp, sp, label, [["CompatibleSlots", ["BodySkin"]]]));
-  blocks.push([">" + MANIFEST, indent("a|StoreItems|" + ssp), ...(helmet ? [indent("a|StoreItems|" + shp)] : [])]);
-  const out = ["# " + label, "$if can_add_new_types()"];
+  if (body) blocks.push(block(`+${sp}|${CUSTOMIZATION}`, [["LocalizeTag", label], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ...who, ["UpgradeSkinOverride", vp], ["CompatibleSlots", ["BodySkin"]], ["AllowUglyMode", 1], helmet && ["ForcedCustomizations", { Helmet: hp }], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", info.parts.filter((_, i) => sk.picked.has(i))]]));
+  if (body) blocks.push(store(ssp, sp, label, [["CompatibleSlots", ["BodySkin"]]]));
+  blocks.push([">" + MANIFEST, ...(body ? [indent("a|StoreItems|" + ssp)] : []), ...(helmet ? [indent("a|StoreItems|" + shp)] : [])]);
+  const out = ["# " + (body ? label : helmetName), "$if can_add_new_types()"];
   blocks.forEach((b) => out.push("", ...b));
   out.push("$endif");
-  if (info.fix) out.push("", ">" + info.fix.material, indent("PS:EmissiveTintColorLo=" + eeValue(info.fix.lo)), indent("PS:EmissiveTintColorHi=" + eeValue(info.fix.hi)));
+  if (info.fix && body) out.push("", ">" + info.fix.material, indent("PS:EmissiveTintColorLo=" + eeValue(info.fix.lo)), indent("PS:EmissiveTintColorHi=" + eeValue(info.fix.hi)));
   return out.join("\n") + "\n";
 }
 function renderSkin() {
