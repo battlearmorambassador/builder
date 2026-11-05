@@ -69,6 +69,7 @@ const STAT_NAMES = {
   WEAPON_MELEE_COMBO_DURATION_BONUS: "Combo duration", WEAPON_MELEE_HEAVY_CHARGE_SPEED: "Heavy attack wind up", WEAPON_LIFE_STEAL: "Life steal",
   WEAPON_EXPLOSION_RADIUS: "Blast radius", WEAPON_NOISE_REDUCTION: "Noise reduction", WEAPON_MELEE_FINISHER_DAMAGE: "Finisher damage",
   WEAPON_MELEE_SLAM_DAMAGE_BONUS: "Slam damage", WEAPON_AMMO_CONSUME_RATE: "Ammo efficiency", NONE: "None",
+  AVATAR_PROC_TIME: "Status duration on self", SKILL_RJ_BC_COOLDOWN: "Battle Avionics cooldown", WEAPON_DAMAGE_WEAKPOINT: "Weak point damage", WEAPON_AUTO_RELOAD_RATE: "Magazine reloaded when holstered", WEAPON_CRIT_CHANCE_BODY_PART: "Critical chance on weak point hits",
 };
 const STAT_GROUPS = [
   ["Warframe: abilities", /^AVATAR_(ABILITY|CASTING|AURA|POWER_DAMAGE)/],
@@ -85,10 +86,12 @@ const STAT_GROUPS = [
   ["Weapon: damage", /^WEAPON_/],
   ["K-Drive", /^VEHICLE_/],
   ["Gameplay", /^GAMEPLAY_/],
+  ["Railjack", /^SKILL_RJ/],
   ["Other", /./],
+  ["Special effects", /$^/],
 ];
 const titleCase = (s) => s.replace(/(^|[\s(\/-])(?!(?:of|at|to|in|and|the|per|or|with)\b)([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\(S\)/g, "(s)");
-const statName = (v) => titleCase(STAT_NAMES[v] || humanize(v.replace(/^(AVATAR|WEAPON|VEHICLE|GAMEPLAY|SKILL|CSUT)_/, "")));
+const statName = (v) => window.STAT_LABELS?.[v] || (STAT_NAMES[v] ? titleCase(STAT_NAMES[v]) : "");
 const labelOf = (k) => titleCase(LABELS[k] || humanize(k));
 
 const ENUM_NAMES = {
@@ -960,7 +963,7 @@ function statInfo(sn, path) {
   const par = getAt(ed.sides[sn].edit, path.slice(0, -1));
   if (!isObj(par) || !("OperationType" in par)) return null;
   const op = String(par.OperationType);
-  return { op, max: modMaxRank(sn), pct: !!par.DisplayAsPercent, additive: scalesWithRank(op) };
+  return { op, max: modMaxRank(sn), pct: showsPercent(par, op), additive: scalesWithRank(op) };
 }
 const fmtNum = (x) => String(+x.toFixed(4));
 const statAt = (v, st, rank) => (st.additive ? v * (rank + 1) : v) * (st.pct ? 100 : 1);
@@ -974,9 +977,11 @@ function statText(v, st) {
   return st.max != null ? `In game: ${f(0)} at rank 0, ${f(st.max)} at rank ${st.max} (max)` : `In game: ${f(0)} per rank`;
 }
 
+const GENERAL_STATS = new Set(["WEAPON_MELEE_HEAVY_CHARGE_SPEED","WEAPON_DAMAGE_IF_VICTIM_PROC_ACTIVE","WEAPON_INIT_DAMAGE_MOD","WEAPON_PARRY_COUNTER_CHANCE_STAGGER"]);
+const isSpecialStat = (t) => !GENERAL_STATS.has(t) && statName(t).split(" ").length >= 5;
 function statSelect(vals, v) {
   const groups = new Map(STAT_GROUPS.map(([g]) => [g, []]));
-  for (const x of vals) groups.get(STAT_GROUPS.find(([, re]) => re.test(x))[0]).push(x);
+  for (const x of vals) groups.get(isSpecialStat(x) ? "Special effects" : STAT_GROUPS.find(([, re]) => re.test(x))[0]).push(x);
   return h("select", { class: "input mini" }, [...groups].filter(([, xs]) => xs.length).map(([g, xs]) =>
     h("optgroup", { label: g }, xs.sort((a, b) => statName(a).localeCompare(statName(b))).map((x) => h("option", { value: x, selected: x === v }, statName(x))))));
 }
