@@ -267,6 +267,7 @@ async function loadList(cat) {
   return (listCache[cat] = items);
 }
 const loadAllLists = () => Promise.all(Object.keys(CATS).map((c) => loadList(c).catch(() => []))).then((l) => l.flat());
+const loadCompatLists = () => Promise.all(["suit", "weapon", "upgrade"].map((c) => loadList(c).catch(() => [])));
 function fieldGroup(cat, path) {
   if (path.startsWith("/Lotus/StoreItems/")) return "store";
   if (cat === "upgrade") return isArcanePath(path) ? "arcane" : "mod";
@@ -893,6 +894,8 @@ function leafWidget(sn, path, v, n) {
     for (const o of sides) if (o !== sn) syncSide(o);
     const s = ed.sides[sn];
     n.classList.toggle("mod", !hasAt(s.base, path) || !deepEq(getAt(s.base, path), nv));
+    const owner = getAt(s.edit, path.slice(0, -1)), title = n.parentElement?.closest(".node")?.querySelector(":scope > .line .nm");
+    if (title && isObj(owner) && owner.UpgradeType) title.textContent = title.textContent.split(" ")[0] + " " + statLine(owner);
     const l = n.querySelector(".loc");
     const inEl = n.querySelector("input");
     if (l) l.textContent = typeof nv === "string" && loc(nv) && inEl?.value !== loc(nv) ? "“" + loc(nv) + "”" : "";
@@ -904,6 +907,11 @@ function leafWidget(sn, path, v, n) {
     return sel;
   }
   const textField = !isIdx(path[path.length - 1]) && /Loc|Desc|HelpText/.test(key || "");
+  if (key === "ItemCompatibility" && path.length === 1 && typeof v === "string") {
+    const sel = compatSelect(v, "input mini");
+    sel.addEventListener("change", () => set(sel.value));
+    return sel;
+  }
   const stat = path.length > 2 ? getAt(ed.sides[sn].edit, path.slice(0, path.findIndex((x, i) => i > 0 && isIdx(path[i - 1]) ) )) : null;
   const choice = isObj(stat) ? STAT_CHOICES[stat.UpgradeType] : null;
   const named = key === choice?.key ? choice.options.map(([x, l]) => [x, l]) : key === "ValidModifiers" ? Object.entries(WHEN_NAMES).filter(([x]) => x.startsWith("PM_")) : key === "ValidProcTypes" ? Object.entries({ ...PROC_NAMES, PT_LIFT_HIT: WHEN_NAMES.PT_LIFT_HIT }) : key === "SymbolFilter" && /^CC_/.test(v) ? Object.entries(WHEN_NAMES).filter(([x]) => x.startsWith("CC_")) : null;
@@ -1029,7 +1037,7 @@ function node(sn, path, v, flt = treeFilter) {
   const label = keyLabel(path, k, inArr, v, restoreDot(sn, path));
   if (isObj(v)) {
     const narrow = !!flt && !nameHit(k);
-    const open = ed.open.has(id) || (narrow && !ed.closed.has(id) && deepHit(k, v));
+    const open = ed.open.has(id) || ((narrow && deepHit(k, v) || changedOnly) && !ed.closed.has(id));
     const arr = Array.isArray(v);
     const count = arr ? v.length : Object.keys(v).length;
     const toggle = () => {
@@ -1041,10 +1049,15 @@ function node(sn, path, v, flt = treeFilter) {
     n.append(h("div", { class: "line" },
       h("button", { class: "tw", onclick: toggle }, open ? "▾" : "▸"),
       Object.assign(label, { onclick: toggle, className: "k click" }),
-      h("span", { class: "sum", onclick: toggle }, count + (arr ? (count === 1 ? " item" : " items") : count === 1 ? " field" : " fields")),
+      h("span", { class: "sum", onclick: toggle }, v.UpgradeType ? "" : count + (arr ? (count === 1 ? " item" : " items") : count === 1 ? " field" : " fields")),
       acts));
     if (open) {
-      const kids = h("div", { class: "kids" }, Object.entries(v).filter(show).map(([kk, x]) => node(sn, [...path, kk], x, sub)));
+      const changedAt = (kk) => { const p = [...path, kk]; return !hasAt(s.base, p) || !deepEq(getAt(s.base, p), getAt(s.edit, p)); };
+      const quiet = ([kk, x]) => !arr && !narrow && kk !== "Value" && !changedAt(kk) && (x === "" || x === 0 || (isObj(x) && !Object.keys(x).length));
+      const entries = Object.entries(v).filter(show).filter(([kk]) => !changedOnly || changedAt(kk));
+      const extra = changedOnly ? 0 : entries.filter(quiet).length, full = ed.full.has(id);
+      const kids = h("div", { class: "kids" }, entries.filter((e) => full || changedOnly || !quiet(e)).map(([kk, x]) => node(sn, [...path, kk], x, sub)));
+      if (extra) kids.append(h("button", { class: "more-fields", type: "button", onclick: () => { full ? ed.full.delete(id) : ed.full.add(id); n.replaceWith(node(sn, path, getAt(s.edit, path), flt)); } }, full ? "Hide empty fields" : "Show " + extra + (extra === 1 ? " more field" : " more fields")));
       if (arr) kids.append(h("button", { class: "btn btn-ghost add-item", onclick: () => { record(sn, { t: "push", path, v: newItem(sn, path, v) }); refresh(); } }, "+ Add item"));
       n.append(kids);
     }
@@ -1065,7 +1078,7 @@ const restoreDot = (sn, path) => h("button", { class: "dot-btn", type: "button",
 function keyLabel(path, k, inArr, v, dot) {
   const el = h("span", { class: "k", title: path.join(".") }, dot);
   if (inArr) {
-    const what = isObj(v) ? (v.UpgradeType ? statName(String(v.UpgradeType)) : v.ItemType ? tail(String(v.ItemType)) : null) : null;
+    const what = isObj(v) ? (v.UpgradeType ? statLine(v) : v.ItemType ? tail(String(v.ItemType)) : null) : null;
     el.append(h("span", { class: "nm" }, "#" + (+k + 1) + (what ? " " + what : "")));
     return el;
   }
@@ -1084,10 +1097,31 @@ function warnTip(text) {
   return h("span", { class: "tip", tabindex: "0", onclick: (e) => e.preventDefault() }, icon, h("span", { class: "tip-box", role: "tooltip" }, text));
 }
 
+let changedOnly = false;
+function expandAll() {
+  const walk = (sn, path, v) => {
+    if (!isObj(v)) return;
+    if (path.length) ed.open.add(sn + "|" + path.join("."));
+    for (const [k, x] of Object.entries(v)) walk(sn, [...path, k], x);
+  };
+  ed.closed.clear();
+  for (const sn of Object.keys(ed.sides)) {
+    if (!ed.sides[sn]?.edit || (ed.multi && sn !== "all")) continue;
+    walk(sn, [], ed.sides[sn].edit);
+    for (const src of Object.values(ed.sides[sn].origin || {})) ed.inhOpen.add(sn + "|" + src);
+  }
+  renderSides();
+}
+function collapseAll() {
+  ed.open.clear();
+  ed.closed.clear();
+  ed.inhOpen.clear();
+  renderSides();
+}
 function renderSide(sn) {
   const s = ed.sides[sn];
   const filter = (treeFilter = $("#key-filter").value.trim().toLowerCase());
-  const match = (k) => !filter || deepHit(k, s.edit[k]);
+  const match = (k) => (!filter || deepHit(k, s.edit[k])) && (!changedOnly || !(k in s.base) || !deepEq(s.base[k], s.edit[k]));
   const keys = Object.keys(s.edit).filter((k) => !HIDDEN(k));
   const pinned = (k) => ed.eye?.mode === "new" && sn === "item" && (k === "LocalizeTag" || k === "LocalizeDescTag");
   const own = keys.filter((k) => s.ownKeys.includes(k) || !(k in s.base) || pinned(k)).sort((a, b) => pinned(b) - pinned(a));
@@ -1112,12 +1146,13 @@ function renderSide(sn) {
       const gone = removedInh.filter((k) => s.origin[k] === src && (!filter || nameHit(k)));
       const gid = sn + "|" + src;
       const shown = ks.filter(match);
-      if (filter && !shown.length && !gone.length) return null;
-      return h("details", { class: "inh", open: filter ? true : ed.inhOpen.has(gid), ontoggle: (e) => { if (!filter) e.target.open ? ed.inhOpen.add(gid) : ed.inhOpen.delete(gid); } },
+      if ((filter || changedOnly) && !shown.length && !gone.length) return null;
+      return h("details", { class: "inh", open: filter || changedOnly ? true : ed.inhOpen.has(gid), ontoggle: (e) => { if (!filter && !changedOnly) e.target.open ? ed.inhOpen.add(gid) : ed.inhOpen.delete(gid); } },
         h("summary", {}, h("span", {}, `${ed.eye?.mode === "new" ? "Copied" : "Inherited"} from ${tail(src || "parent type")} (${ks.length})`), isBaseType(src) ? warnTip(`You also need to edit this parent type (${tail(src)}) for some changes to take effect.`) : null),
         h("div", { class: "tree" }, shown.map((k) => node(sn, [k], s.edit[k])), gone.map(removedRow)));
     }),
-    !keys.length && !removed.length ? h("div", { class: "empty" }, "No metadata found for this type.") : null);
+    !keys.length && !removed.length ? h("div", { class: "empty" }, "No metadata found for this type.") : null,
+    changedOnly && keys.length && !keys.some(match) && !removed.length && !removedInh.length ? h("div", { class: "empty" }, "No changes yet.") : null);
 }
 const BASIC_GROUPS = new Set(["mod", "arcane", "suit", "weapon"]);
 const isAdvanced = () => !!store.get("advancedEditor");
@@ -1244,7 +1279,7 @@ function resetEditor(state, loading) {
   actionForm = null;
   previewKey = null;
   $("#card-preview").replaceChildren();
-  ed = { name: "", sides: null, ops: [], text: [], actions: [], redo: [], open: new Set(), closed: new Set(), inhOpen: new Set(), ...state };
+  ed = { name: "", sides: null, ops: [], text: [], actions: [], redo: [], full: new Set(), open: new Set(), closed: new Set(), inhOpen: new Set(), ...state };
   $("#eye-panel").hidden = true;
   $("#target-icon").removeAttribute("src");
   $("#parent-warn").hidden = true;
@@ -1303,6 +1338,7 @@ async function showEditor(cat, path, eye = null) {
 
   let entry;
   if (CATS[cat]) try { entry = (await loadList(cat)).find((i) => i.path === src); } catch {}
+  if (ed.group === "mod" || ed.group === "arcane") await loadCompatLists();
   if (ed !== mine) return;
   ed.entry = entry;
   const name = eye?.mode === "new" ? tail(path) : ed.entry?.name || loc(ed.sides.item.eff.LocalizeTag) || tail(path);
@@ -1399,6 +1435,7 @@ async function showMulti(cat, paths) {
   });
   ed.sides.all = { path: "", origin: {}, ownKeys: [] };
   const byPath = new Map((await loadAllLists()).map((i) => [i.path, i.name]));
+  await loadCompatLists();
   if (!ed || ed.paths !== paths) return;
   const names = paths.map((p) => byPath.get(p) || tail(p));
   $("#target-name").textContent = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
@@ -1441,6 +1478,9 @@ function initEditor() {
   $("#cond-ver").addEventListener("input", () => { syncCond(); renderOutput(); });
   $("#key-filter").addEventListener("input", debounce(() => { if (!ed?.sides) return; ed.closed.clear(); renderSides(); }, 120));
   $("#adv-toggle").addEventListener("change", (e) => { store.set("advancedEditor", e.target.checked); if (ed?.sides) renderSides(); });
+  $("#changed-only").addEventListener("change", (e) => { changedOnly = e.target.checked; if (ed?.sides) { ed.closed.clear(); renderSides(); } });
+  $("#btn-expand").onclick = () => { if (ed?.sides) expandAll(); };
+  $("#btn-collapse").onclick = () => { if (ed?.sides) collapseAll(); };
   $("#btn-fr").onclick = () => { $("#fr").hidden = !$("#fr").hidden; if (!$("#fr").hidden) $("#fr-from").focus(); };
   $("#fr-add").onclick = () => {
     const from = $("#fr-from").value, to = $("#fr-to").value;

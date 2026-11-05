@@ -254,6 +254,40 @@ function changeStatForm(sn, i) {
     }));
 }
 const enumSelect = (vals, cur) => h("select", { class: "input" }, cur == null ? h("option", { value: "" }, "(none)") : null, [...new Set([cur, ...vals])].filter(Boolean).map((v) => h("option", { value: v, selected: v === cur }, enumLabel(v))));
+const COMPAT_SECTIONS = [["suit", "Warframe", "Warframes"], ["suit", "Archwing", "Archwings"], ["suit", "Necramech", "Necramechs"], ["suit", "Sentinel", "Sentinels"], ["suit", "Companion", "Companions"], ["weapon", "Primary", "Primary Weapons"], ["weapon", "Secondary", "Secondary Weapons"], ["weapon", "Melee", "Melee Weapons"], ["weapon", "Arch-gun", "Arch-guns"], ["weapon", "Arch-melee", "Arch-melee Weapons"], ["weapon", "Companion", "Companion Weapons"], ["weapon", "Operator", "Amps"], ["weapon", "Drifter", "Drifter Weapons"]];
+let compatItemsCache = null, compatItemsFor = null;
+function compatItems() {
+  if (compatItemsCache && compatItemsFor === listCache.suit + "" + listCache.weapon?.length) return compatItemsCache;
+  const groups = compatGroups(), sections = new Map();
+  for (const [cat, sub, title] of COMPAT_SECTIONS) {
+    const found = new Map();
+    for (const i of listCache[cat] || []) {
+      if (i.sub !== sub) continue;
+      const parent = i.raw.parentName, key = cat === "suit" && sub === "Warframe" && /BaseSuit$/.test(parent || "") && !groups.has(i.path) ? parent : i.path;
+      const name = key === i.path ? i.name : groups.get(key) || i.name, old = found.get(key);
+      if (!old || name.length < old.length) found.set(key, name);
+    }
+    sections.set(title, found);
+  }
+  compatItemsFor = listCache.suit + "" + listCache.weapon?.length;
+  return (compatItemsCache = sections);
+}
+function compatLabel(v) {
+  for (const found of compatItems().values()) if (found.has(v)) return found.get(v);
+  return compatGroups().get(v) || "";
+}
+function compatSelect(cur, cls = "input") {
+  const groups = compatGroups(), sections = compatItems(), main = new Set(MAIN_COMPAT.map(([k]) => k)), placed = new Set(main);
+  const option = ([v, l]) => h("option", { value: v, selected: v === cur }, l);
+  const byName = (a, b) => a[1].localeCompare(b[1]);
+  const parts = [...sections].map(([title, found]) => {
+    const list = [...found].filter(([v]) => !placed.has(v)).sort(byName);
+    list.forEach(([v]) => placed.add(v));
+    return list.length ? h("optgroup", { label: title }, list.map(option)) : null;
+  });
+  const rest = [...new Set([cur, ...groups.keys()])].filter((v) => v && !placed.has(v)).map((v) => [v, groups.get(v) || tail(v)]).sort(byName);
+  return h("select", { class: cls }, h("optgroup", { label: "Main groups" }, MAIN_COMPAT.map(option)), parts, rest.length ? h("optgroup", { label: "Other" }, rest.map(option)) : null);
+}
 function infoForm(sn) {
   const e = ed.sides[sn].edit;
   const name = h("input", { class: "input", value: loc(e.LocalizeTag) || e.LocalizeTag || "", autocomplete: "off", spellcheck: "false" });
@@ -262,11 +296,8 @@ function infoForm(sn) {
   const isMod = ed.group === "mod";
   const pol = isMod ? enumSelect(Object.keys(ENUM_NAMES).filter((k) => k.startsWith("AP_")), e.ArtifactPolarity) : null;
   const drain = isMod ? enumSelect(FIELDS.mod?.BaseDrain?.enum || [], e.BaseDrain) : null;
-  const groups = compatGroups(), curCompat = e.ItemCompatibility || "";
-  const main = new Set(MAIN_COMPAT.map(([k]) => k));
-  const compatOption = (v) => h("option", { value: v, selected: v === curCompat }, groups.get(v) || tail(v));
-  const rest = [...new Set([curCompat, ...groups.keys()])].filter((v) => v && !main.has(v)).sort((a, b) => (groups.get(a) || tail(a)).localeCompare(groups.get(b) || tail(b)));
-  const compat = h("select", { class: "input" }, h("optgroup", { label: "Main groups" }, MAIN_COMPAT.map(([k]) => compatOption(k))), h("optgroup", { label: "Specific" }, rest.map(compatOption)));
+  const curCompat = e.ItemCompatibility || "";
+  const compat = compatSelect(curCompat);
   const curType = modType(e);
   const type = h("select", { class: "input" }, MOD_TYPES.map(([v, l]) => h("option", { value: v, selected: v === curType }, v ? l : builtInType(ed.path) || l)));
   const oldName = name.value, oldDesc = desc.value;
@@ -280,7 +311,7 @@ function infoForm(sn) {
       if (rarity.value && rarity.value !== e.Rarity) edits.push(["Rarity", rarity.value, "Rarity: " + enumLabel(rarity.value)]);
       if (pol?.value && pol.value !== e.ArtifactPolarity) edits.push(["ArtifactPolarity", pol.value, "Polarity: " + enumLabel(pol.value)]);
       if (drain?.value && drain.value !== e.BaseDrain) edits.push(["BaseDrain", drain.value, "Base drain: " + enumLabel(drain.value)]);
-      if (isMod && compat.value !== curCompat) edits.push(["ItemCompatibility", compat.value, "Compatible with: " + (groups.get(compat.value) || tail(compat.value))]);
+      if (isMod && compat.value !== curCompat) edits.push(["ItemCompatibility", compat.value, "Compatible with: " + compat.selectedOptions[0].textContent]);
       if (isMod && type.value !== curType) {
         if (curType) edits.push([curType, 0, ""]);
         if (type.value) edits.push([type.value, 1, ""]);
@@ -441,7 +472,7 @@ function modCard(e) {
   const rank = modMaxRank(), drain = cardDrain(e), raw = ed.entry?.raw;
   const icon = e.Icon || ed.entry?.icon, stats = (Array.isArray(e.Upgrades) ? e.Upgrades : []).filter(isObj);
   const text = (k) => loc(k) || (typeof k === "string" && !k.startsWith("/") ? k : "");
-  const tag = String(compatGroups().get(e.ItemCompatibility) || raw?.compatName || tail(String(e.ItemCompatibility || ""))).replace(/^Lotus/, "");
+  const tag = String(compatLabel(e.ItemCompatibility) || raw?.compatName || tail(String(e.ItemCompatibility || ""))).replace(/^Lotus/, "");
   const label = cardLabel(ed.eye?.base || ed.path, String(e.Rarity || "COMMON"), e), style = CARD_STYLES[label] || CARD_STYLES.Common || {};
   const glow = (ICON_TINTS[label] || [1, 1, 1]).map((c) => Math.round(Math.min(1, c / 1.5) * 255)).join(",");
   const stone = label === "Immortal";

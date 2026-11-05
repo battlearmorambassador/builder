@@ -118,9 +118,11 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 #view-edit .pane:last-child { max-height: calc(100vh - 150px); overflow: auto; }
 .pane-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--dim); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
 .pane-head .tools, .file-btn { text-transform: none; letter-spacing: 0; }
-.tools { display: flex; gap: 6px; align-items: center; }
+.tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; align-items: center; }
+.more-fields { background: none; border: 0; padding: 4px 6px 6px 32px; color: var(--faint); font: 12px var(--sans); cursor: pointer; }
+.more-fields:hover { color: var(--fg); }
 .tools .input { width: 160px; }
-#view-edit.basic #key-filter, #view-edit.basic #btn-fr, #view-edit.basic #btn-reset, #view-edit.basic #fr, #view-edit.basic .add-wrap { display: none; }
+#view-edit.basic #key-filter, #view-edit.basic .tree-tool, #view-edit.basic #btn-fr, #view-edit.basic #btn-reset, #view-edit.basic #fr, #view-edit.basic .add-wrap { display: none; }
 .basic-note { margin: 0; padding: 0 14px 12px; border-bottom: 1px solid var(--line); }
 .output { margin: 0; padding: 14px; min-height: 220px; max-height: calc(100vh - 220px); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .output .c { color: var(--faint); }
@@ -174,8 +176,9 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .stat .eq { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); }
 .stat .eq .input { width: 90px; }
 .game { font-size: 12px; }
-.inh { margin: 0 8px 10px; border: 1px dashed var(--line-2); border-radius: 6px; }
-.inh summary { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 8px 12px; color: var(--dim); font-size: 13px; }
+.inh { margin: 0 8px; border-top: 1px solid var(--line); }
+.inh summary { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 8px 6px; color: var(--faint); font-size: 13px; }
+.inh summary:hover { color: var(--fg); }
 .inh summary > span:first-child { flex: 1; }
 .inh .tree { padding: 0 4px 6px; }
 .tip { position: relative; display: inline-flex; color: var(--warn); cursor: help; outline: none; }
