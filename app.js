@@ -39,10 +39,10 @@ const LABELS = {
   RecipeHelpText: "Recipe help text", UiName: "UI name", IsPrime: "Is prime", Diorama: "Diorama",
   DamageType: "Damage type", UpgradeType: "Stat", OperationType: "How it applies", Value: "Value",
   DisplayAsPercent: "Show as %", DisplayAsMultiplier: "Show as ×", LocTag: "Stat text", ValidType: "Only for type",
-  ValidModifiers: "Only with modifiers", ValidProcTypes: "Only with procs", SmallerIsBetter: "Lower is better",
+  ValidModifiers: "When", SmallerIsBetter: "Lower is better",
   RoundTo: "Round to", ReverseValueSymbol: "Reverse +/−", BuildPrice: "Build price (credits)", BuildTime: "Build time (s)",
   SkipBuildTimePrice: "Rush price (platinum)", Ingredients: "Ingredients", ResultItem: "Result item",
-  Quality: "Quality", Polarities: "Polarities", HudBuffIcon: "Buff icon", StatusDescTag: "Status description",
+  SymbolFilter: "Condition", ValidProcTypes: "Status type", UpgradeObject: "Target", Quality: "Quality", Polarities: "Polarities", HudBuffIcon: "Buff icon", StatusDescTag: "Status description",
 };
 const humanize = (k) => k.replace(/^.*:/, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ").replace(/\s+/g, " ").trim().toLowerCase().replace(/^./, (c) => c.toUpperCase());
 const HIDDEN = (k) => /DateAdded|^Default\w*Colou?r|^AdditionalItems$/i.test(k);
@@ -904,6 +904,18 @@ function leafWidget(sn, path, v, n) {
     return sel;
   }
   const textField = !isIdx(path[path.length - 1]) && /Loc|Desc|HelpText/.test(key || "");
+  const stat = path.length > 2 ? getAt(ed.sides[sn].edit, path.slice(0, path.findIndex((x, i) => i > 0 && isIdx(path[i - 1]) ) )) : null;
+  const choice = isObj(stat) ? STAT_CHOICES[stat.UpgradeType] : null;
+  const named = key === choice?.key ? choice.options.map(([x, l]) => [x, l]) : key === "ValidModifiers" ? Object.entries(WHEN_NAMES).filter(([x]) => x.startsWith("PM_")) : key === "ValidProcTypes" ? Object.entries({ ...PROC_NAMES, PT_LIFT_HIT: WHEN_NAMES.PT_LIFT_HIT }) : key === "SymbolFilter" && /^CC_/.test(v) ? Object.entries(WHEN_NAMES).filter(([x]) => x.startsWith("CC_")) : null;
+  if (named && typeof v === "string") {
+    const sel = h("select", { class: "input mini" }, (named.some(([x]) => x === v) ? named : [[v, v], ...named]).map(([x, l]) => h("option", { value: x, selected: x === v }, l)));
+    sel.addEventListener("change", () => {
+      const text = key === choice?.key ? choice.options.find((o) => o[0] === sel.value)?.[2] : null;
+      if (text) record(sn, { t: "set", path: [...path.slice(0, -1), "LocTag"], v: text });
+      set(sel.value);
+    });
+    return sel;
+  }
   if (spec?.enum && typeof v === "string" && !textField) {
     const vals = spec.enum.includes(v) ? spec.enum : [v, ...spec.enum];
     const sel = key === "UpgradeType" ? statSelect(vals, v) : h("select", { class: "input mini" }, vals.map((x) => h("option", { value: x, selected: x === v }, enumLabel(x))));
@@ -981,7 +993,7 @@ const GENERAL_STATS = new Set(["WEAPON_MELEE_HEAVY_CHARGE_SPEED","WEAPON_DAMAGE_
 const isSpecialStat = (t) => !GENERAL_STATS.has(t) && statName(t).split(" ").length >= 5;
 function statSelect(vals, v) {
   const groups = new Map(STAT_GROUPS.map(([g]) => [g, []]));
-  for (const x of vals) groups.get(isSpecialStat(x) ? "Special effects" : STAT_GROUPS.find(([, re]) => re.test(x))[0]).push(x);
+  for (const x of vals.filter((y) => statName(y) || y === v)) groups.get(isSpecialStat(x) ? "Special effects" : STAT_GROUPS.find(([, re]) => re.test(x))[0]).push(x);
   return h("select", { class: "input mini" }, [...groups].filter(([, xs]) => xs.length).map(([g, xs]) =>
     h("optgroup", { label: g }, xs.sort((a, b) => statName(a).localeCompare(statName(b))).map((x) => h("option", { value: x, selected: x === v }, statName(x))))));
 }
