@@ -49,8 +49,8 @@ const HIDDEN = (k) => /DateAdded|^Default\w*Colou?r|^AdditionalItems$/i.test(k);
 const ENUMS = window.ENUMS_DATA || {};
 
 const OP_NAMES = {
-  ADD: "Add (+)", ADD_BASE: "Add to base value", MULTIPLY: "Multiply (×)", STACKING_MULTIPLY: "Add percent (stacks)",
-  SET: "Set to value", SET_BASE: "Set base value", SET_MAX: "Cap at most", SET_MIN: "Raise to at least",
+  STACKING_MULTIPLY: "Multiplicative", ADD: "Additive", MULTIPLY: "Multiply", ADD_BASE: "Add to Base",
+  SET: "Set to Value", SET_BASE: "Set Base Value", SET_MAX: "Cap at Most", SET_MIN: "Raise to at Least",
 };
 const STAT_NAMES = {
   AVATAR_POWER_MAX: "Energy max", AVATAR_POWER_RATE: "Energy regen", AVATAR_ABILITY_STRENGTH: "Ability strength",
@@ -87,8 +87,9 @@ const STAT_GROUPS = [
   ["Gameplay", /^GAMEPLAY_/],
   ["Other", /./],
 ];
-const statName = (v) => STAT_NAMES[v] || humanize(v.replace(/^(AVATAR|WEAPON|VEHICLE|GAMEPLAY|SKILL|CSUT)_/, ""));
-const labelOf = (k) => LABELS[k] || humanize(k);
+const titleCase = (s) => s.replace(/(^|[\s(\/-])(?!(?:of|at|to|in|and|the|per|or|with)\b)([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\(S\)/g, "(s)");
+const statName = (v) => titleCase(STAT_NAMES[v] || humanize(v.replace(/^(AVATAR|WEAPON|VEHICLE|GAMEPLAY|SKILL|CSUT)_/, "")));
+const labelOf = (k) => titleCase(LABELS[k] || humanize(k));
 
 const ENUM_NAMES = {
   AP_ATTACK: "Madurai", AP_DEFENSE: "Vazarin", AP_TACTIC: "Naramon", AP_POWER: "Zenurik", AP_WARD: "Unairu",
@@ -97,10 +98,10 @@ const ENUM_NAMES = {
   DT_ELECTRICITY: "Electricity", DT_POISON: "Toxin", DT_EXPLOSION: "Blast", DT_GAS: "Gas", DT_MAGNETIC: "Magnetic",
   DT_RADIATION: "Radiation", DT_VIRAL: "Viral", DT_CORROSIVE: "Corrosive", DT_FINISHER: "True", DT_RADIANT: "Void",
   DT_SENTIENT: "Tau", DT_ANY: "Any", COMMON: "Common", UNCOMMON: "Uncommon", RARE: "Rare", LEGENDARY: "Legendary",
-  MM_HIDDEN: "Hidden", MM_VISIBLE: "Visible", ADD: "Add (+)", MULTIPLY: "Multiply (×)", STACKING_MULTIPLY: "Stacking add (+)",
-  QA_NONE: "None", QA_LOW: "Low", QA_MEDIUM: "Medium", QA_HIGH: "High", QA_VERY_HIGH: "Very high",
+  MM_HIDDEN: "Hidden", MM_VISIBLE: "Visible",
+  QA_NONE: "None", QA_LOW: "Low", QA_MEDIUM: "Medium", QA_HIGH: "High", QA_VERY_HIGH: "Very High",
 };
-const enumLabel = (v) => OP_NAMES[v] || ENUM_NAMES[v] || (v === "" ? "(none)" : /^[A-Z0-9_]+$/.test(v) ? humanize(v) : v);
+const enumLabel = (v) => OP_NAMES[v] || ENUM_NAMES[v] || (v === "" ? "(none)" : /^[A-Z0-9_]+$/.test(v) ? titleCase(humanize(v)) : v);
 
 const COMMON = {
   weapon: ["LocalizeTag", "LocalizeDescTag", "Icon", "ArtifactSlots", "RequiredLevel", "MarketMode", "ExcludeFromCodex"],
@@ -119,6 +120,7 @@ const h = (tag, attrs = {}, ...kids) => {
     else if (k in el && typeof v !== "string") el[k] = v;
     else el.setAttribute(k, v === true ? "" : v);
   }
+  if (tag === "button" && attrs.title) el.setAttribute("aria-label", attrs.title);
   for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid);
   return el;
 };
@@ -126,7 +128,8 @@ const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
 };
 
 function toast(msg) {
@@ -141,7 +144,7 @@ const jsonCache = new Map();
 function getJSON(url) {
   if (!jsonCache.has(url)) {
     jsonCache.set(url, fetch(url).then((r) => {
-      if (!r.ok) throw new Error(r.status + " " + url);
+      if (!r.ok) throw Object.assign(new Error(r.status + " " + url), { status: r.status });
       return r.json();
     }).catch((e) => { jsonCache.delete(url); throw e; }));
   }
@@ -155,8 +158,22 @@ const VERSIONS = window.VERSIONS_DATA || [];
 const loc = (k) => (DICT && k && DICT[k]) || null;
 const tail = (p) => p.split("/").pop();
 const toStorePath = (p) => p.replace(/^\/Lotus\//, "/Lotus/StoreItems/");
-const cleanName = (key, path) => (loc(key) || tail(path)).replace(/<[^>]+>\s*/g, "");
+const stripTags = (s) => s.replace(/<[^>]+>\s*/g, "");
+const cleanName = (key, path) => stripTags(loc(key) || tail(path));
+const isArcanePath = (p) => p.includes("/CosmeticEnhancers/") && !p.includes("/Peculiars/");
+const OFFLINE = "Could not reach the game data. Check your connection and try again.";
 const hideBroken = (e) => (e.target.style.visibility = "hidden");
+const setIcon = (el, icon) => { el.style.visibility = ""; el.onerror = hideBroken; el.src = IMG + icon; };
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast("Copied"); } catch { toast("Copy failed"); }
+}
+function saveText(name, text, fallback) {
+  const safe = name.replace(/[\\/:*?"<>|]+/g, "_").trim() || fallback;
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  h("a", { href: url, download: safe + ".txt" }).click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast("Saved " + safe + ".txt");
+}
 
 function eeInline(v) {
   if (Array.isArray(v)) return "{" + v.map(eeInline).join(",") + "}";
@@ -181,6 +198,7 @@ function eeStr(s) {
 }
 const RELATIVE = /^[A-Za-z][A-Za-z0-9_]*[a-z][A-Za-z0-9_]*$/;
 const NOT_PATH_KEY = /Loc|Desc|Tag|Name$|Text|Mesh|Anim|Sound|Script|Material/i;
+const missingTypes = new Set();
 async function absolutize(t, path) {
   if (!t) return t;
   const data = clone(t.data);
@@ -192,7 +210,8 @@ async function absolutize(t, path) {
     else if (isObj(v)) for (const [kk, x] of Object.entries(v)) walk(x, kk, top);
   };
   for (const [k, v] of Object.entries(data)) walk(v, k, k);
-  await Promise.all([...found.keys()].slice(0, 300).map((full) => getJSON(BIN + full + ".json").then(() => found.set(full, full), () => {})));
+  const paths = [...found.keys()].filter((full) => !missingTypes.has(full));
+  for (let i = 0; i < paths.length; i += 40) await Promise.all(paths.slice(i, i + 40).map((full) => getJSON(BIN + full + ".json").then(() => found.set(full, full), () => missingTypes.add(full))));
   const fix = (v, k, top) => {
     if (typeof v === "string") return RELATIVE.test(v) && !NOT_PATH_KEY.test(k) && found.get(dir(top) + v) ? dir(top) + v : v;
     if (Array.isArray(v)) return v.map((x) => fix(x, k, top));
@@ -208,7 +227,7 @@ async function loadType(path) {
   let cur = path;
   for (let depth = 0; cur && depth < 24; depth++) {
     let node;
-    try { node = await getJSON(BIN + cur + ".json"); } catch { break; }
+    try { node = await getJSON(BIN + cur + ".json"); } catch (e) { if (e.status === 404) break; throw e; }
     chain.push({ path: cur, data: node.data || {} });
     const p = node.parent;
     if (!p) break;
@@ -234,7 +253,7 @@ async function loadList(cat) {
     const expName = def.exports[i];
     for (const [path, e] of Object.entries(exp)) {
       let sub;
-      if (cat === "upgrade") sub = expName === "ExportArcanes" || path.includes("/CosmeticEnhancers/") ? "Arcanes" : "Mods";
+      if (cat === "upgrade") sub = expName === "ExportArcanes" || isArcanePath(path) ? "Arcanes" : "Mods";
       else sub = def.sub[e.productCategory] || "Other";
       const name = cleanName(e.name, path);
       const flag = e.isFrivolous ? "impostor" : e.isStarter ? "flawed" : null;
@@ -247,7 +266,7 @@ async function loadList(cat) {
 const loadAllLists = () => Promise.all(Object.keys(CATS).map((c) => loadList(c).catch(() => []))).then((l) => l.flat());
 function fieldGroup(cat, path) {
   if (path.startsWith("/Lotus/StoreItems/")) return "store";
-  if (cat === "upgrade") return path.includes("/CosmeticEnhancers/") ? "arcane" : "mod";
+  if (cat === "upgrade") return isArcanePath(path) ? "arcane" : "mod";
   return CATS[cat] ? cat : null;
 }
 
@@ -261,8 +280,8 @@ function catOfPath(p) {
 
 const CHOICES = [
   { cat: "suit", name: "Suit", sub: "Warframes, Archwings, Necramechs, companions", icon: "/Lotus/Interface/Icons/StoreIcons/Warframes/Excalibur.png" },
-  { cat: "weapon", name: "Weapon", sub: "Primary, secondary, melee...", icon: "/Lotus/Interface/Icons/StoreIcons/Weapons/MeleeWeapons/Weapons/Nikana.png" },
-  { cat: "upgrade", name: "Mods / Arcanes", sub: "Mods and Arcanes", icon: "/Lotus/Interface/Cards/Images/AvatarMods/AbilityDurationMod.png" },
+  { cat: "weapon", name: "Weapon", sub: "Primary, secondary, melee…", icon: "/Lotus/Interface/Icons/StoreIcons/Weapons/MeleeWeapons/Weapons/Nikana.png" },
+  { cat: "upgrade", name: "Mods / Arcanes", sub: "Stats, rarity and compatibility", icon: "/Lotus/Interface/Cards/Images/AvatarMods/AbilityDurationMod.png" },
   { href: "#/eye", name: "Sentient Builder", sub: "Add unobtainable or custom items", icon: "/Lotus/Interface/Graphics/AntiqueMods/SentientBackFrame.png" },
 ];
 
@@ -301,7 +320,7 @@ function drawLegend(cat) {
   const el = $("#pick-legend");
   el.hidden = cat !== "upgrade";
   if (el.hidden || el.childElementCount) return;
-  Object.keys(MOD_FLAGS).forEach((k, i) => {
+  Object.keys(MOD_FLAGS).forEach((k) => {
     el.append(h("span", { class: "legend-item" }, flagIcon(k), MOD_FLAGS[k].label));
   });
 }
@@ -345,11 +364,12 @@ async function showPicker(cat) {
     pick.sub = null;
     $("#grid").replaceChildren();
     $("#subcats").replaceChildren();
-    $("#pick-status").innerHTML = '<span class="spinner"></span>Loading list from warframe-public-export-plus…';
+    $("#pick-status").innerHTML = '<span class="spinner"></span>Loading items…';
     try {
       pick.items = await loadList(cat);
     } catch (e) {
-      $("#pick-status").textContent = "Could not load the item list: " + e.message;
+      $("#pick-status").textContent = OFFLINE;
+      pick.cat = null;
       return;
     }
     if (pick.cat !== cat) return;
@@ -491,7 +511,7 @@ const makeSide = (path, t) => ({ path, own: t?.own || {}, eff: t?.data || {}, or
 function pushOp(rec) {
   let last = null;
   for (let i = ed.ops.length - 1; i >= 0; i--) if (ed.ops[i].side === rec.side) { last = ed.ops[i]; break; }
-  if (rec.t === "set" && last && last.t === "set" && last.path.join(".") === rec.path.join(".")) last.v = clone(rec.v);
+  if (rec.t === "set" && !ed.inAction && !last?.aid && last && last.t === "set" && last.path.join(".") === rec.path.join(".")) last.v = clone(rec.v);
   else ed.ops.push(rec);
   applyOp(ed.sides[rec.side].edit, rec);
 }
@@ -578,6 +598,7 @@ function record(sn, op) {
 function resetKey(sn, k) {
   const targets = sn === "all" ? realSides() : [sn];
   ed.ops = ed.ops.filter((o) => !(targets.includes(o.side) && o.path[0] === k));
+  ed.actions = (ed.actions || []).filter((a) => ed.ops.some((o) => o.aid === a.id));
   for (const t of targets) replay(t);
   if (ed.multi) rebuildAll();
   refresh();
@@ -634,7 +655,7 @@ function sideLines(sn, parentOut = {}) {
     if (toParent(k)) continue;
     if (!s.ownKeys.includes(k) || !(k in base) || !isObj(o) || !isObj(v) || removals.has(k)) { pre.push(k + "=" + eeValue(v)); continue; }
     const t = { q: [], a: [] };
-    if (diffNode(o, v, k, t) && !t.a.some(([, x]) => isObj(x))) { q.push(...t.q); a.push(...t.a); }
+    if (diffNode(o, v, k, t) && !t.a.some(([, x]) => isObj(x)) && ![...t.q.map((x) => x[2]), ...t.a.map((x) => x[1])].some((x) => typeof x === "string" && x.includes("|"))) { q.push(...t.q); a.push(...t.a); }
     else pre.push(k + "=" + eeValue(v));
   }
   const raw = JSON.stringify(s.ownKeys.map((k) => base[k]));
@@ -668,6 +689,7 @@ function buildMulti() {
     if (!owners.has(l)) owners.set(l, []);
     if (!owners.get(l).includes(sn)) owners.get(l).push(sn);
   }
+  ed.sharedParents = Object.keys(parentOut);
   const blocks = new Map();
   for (const [l, who] of owners) {
     const key = who.join(",");
@@ -722,7 +744,7 @@ function emitBlocks(out, blocks) {
 }
 function buildPatch() {
   if (ed.eye) return buildEye();
-  const out = ["# " + ($("#target-name").textContent || tail(ed.path))];
+  const out = ["# " + (ed.name || $("#target-name").textContent || tail(ed.path))];
   if (ed.multi) {
     if (!emitBlocks(out, buildMulti())) out.push(...ed.paths.map((p, i) => (i ? "&" : ">") + p));
     return finish(out);
@@ -736,6 +758,7 @@ function buildPatch() {
     if (i >= 0 && l !== "$clear") { shared.push(l); storeLines.splice(i, 1); }
     else itemOnly.push(l);
   }
+  ed.sharedParents = Object.keys(parentOut);
   const blocks = [
     [[">" + ed.path, "&" + ed.sides.store?.path], shared],
     [[">" + ed.path], itemOnly],
@@ -766,14 +789,26 @@ function highlight(text) {
   }).join("\n");
 }
 
+let draftWarned = false;
 const saveDraft = debounce(() => {
-  if (ed) store.set("draft:" + (ed.multi ? "multi:" + ed.paths.join("|") : (ed.eye ? "eye:" + ed.eye.mode + ":" : "") + ed.path), {
-    eye: ed.eye && { store: ed.eye.store, manifest: ed.eye.manifest }, name: ed.name, ops: ed.ops, text: ed.text, showStore: ed.showStore, cond: [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] });
+  if (!ed) return;
+  const key = "draft:" + (ed.multi ? "multi:" + ed.paths.join("|") : (ed.eye ? "eye:" + ed.eye.mode + ":" : "") + ed.path);
+  if (!ed.eye && !ed.ops.length && !ed.text.length && !$("#cond-on").checked && ed.name === ed.defaultName) { store.del(key); return; }
+  const saved = store.set(key, { eye: ed.eye && { store: ed.eye.store, manifest: ed.eye.manifest }, name: ed.name, ops: ed.ops, text: ed.text, actions: ed.actions, nextAction: ed.nextAction, cond: [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] });
+  if (!saved && !draftWarned) { draftWarned = true; toast("Browser storage is full, so this draft was not saved"); }
 }, 400);
 
+function drawSharedWarn() {
+  const names = ed.sharedParents.map(tail), one = names.length === 1;
+  $("#shared-warn").hidden = !ed.multi || !names.length;
+  $("#shared-warn").textContent = `All ${names.join(" and ")} edits also affect ${one ? "variants that inherit from it" : "variants that inherit from them"}.`;
+}
 function renderOutput() {
   if (!ed?.sides) return;
+  ed.sharedParents = [];
   $("#output").innerHTML = highlight(buildPatch());
+  drawSharedWarn();
+  syncPreview();
   saveDraft();
 }
 
@@ -804,11 +839,28 @@ function defaultFor(spec) {
   return spec.enum ? spec.enum[0] : "";
 }
 
-function locSearch(input, pick, maxLen) {
-  const box = h("div", { class: "sugg", hidden: true });
+function suggestBox(input, box) {
   let items = [], sel = -1;
   const close = () => { box.hidden = true; sel = -1; };
-  const mark = () => items.forEach((b, i) => b.classList.toggle("sel", i === sel));
+  const show = (list) => { items = list; box.replaceChildren(...items); box.hidden = !items.length; sel = -1; };
+  input.addEventListener("keydown", (e) => {
+    if (box.hidden) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      sel = Math.max(0, Math.min(items.length - 1, sel + (e.key === "ArrowDown" ? 1 : -1)));
+      items.forEach((b, i) => b.classList.toggle("sel", i === sel));
+      items[sel]?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter" && sel >= 0) {
+      e.preventDefault();
+      items[sel].dispatchEvent(new MouseEvent("mousedown"));
+    } else if (e.key === "Escape") close();
+  });
+  input.addEventListener("blur", close);
+  return { show, close };
+}
+function locSearch(input, choose, maxLen) {
+  const box = h("div", { class: "sugg", hidden: true });
+  const list = suggestBox(input, box);
   input.addEventListener("input", debounce(() => {
     const q = input.value.trim().toLowerCase();
     const seen = new Set();
@@ -826,32 +878,15 @@ function locSearch(input, pick, maxLen) {
       }
     }
     found.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
-    items = found.slice(0, 30).map(([, , k, v]) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); pick(k); close(); } }, v));
-    box.replaceChildren(...items);
-    box.hidden = !items.length;
-    sel = -1;
+    list.show(found.slice(0, 30).map(([, , k, v]) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); choose(k); list.close(); } }, v)));
   }, 180));
-  input.addEventListener("keydown", (e) => {
-    if (box.hidden) return;
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      sel = Math.max(0, Math.min(items.length - 1, sel + (e.key === "ArrowDown" ? 1 : -1)));
-      mark();
-      items[sel]?.scrollIntoView({ block: "nearest" });
-    } else if (e.key === "Enter" && sel >= 0) {
-      e.preventDefault();
-      items[sel].dispatchEvent(new MouseEvent("mousedown"));
-    } else if (e.key === "Escape") close();
-  });
-  input.addEventListener("blur", close);
   return box;
 }
-function leafWidget(sn, path, v, n, mirror = []) {
+function leafWidget(sn, path, v, n) {
   const spec = leafSpec(sn, path);
   const key = path.filter((p) => !isIdx(p)).pop();
   const set = (nv) => {
     const sides = record(sn, { t: "set", path, v: nv });
-    for (const mp of mirror) record(sn, { t: "set", path: mp, v: nv });
     for (const o of sides) if (o !== sn) syncSide(o);
     const s = ed.sides[sn];
     n.classList.toggle("mod", !hasAt(s.base, path) || !deepEq(getAt(s.base, path), nv));
@@ -881,7 +916,10 @@ function leafWidget(sn, path, v, n, mirror = []) {
     const show = (x) => { if (game) game.textContent = typeof x === "number" ? statText(x, stat) : ""; };
     inp.addEventListener("input", () => {
       const t = inp.value.trim();
-      const x = t !== "" && !isNaN(Number(t)) ? Number(t) : t;
+      const valid = t !== "" && !isNaN(Number(t));
+      inp.classList.toggle("bad", !valid);
+      if (!valid) return;
+      const x = Number(t);
       set(x);
       show(x);
       if (maxIn && typeof x === "number" && document.activeElement !== maxIn) maxIn.value = fmtNum(statAt(x, stat, stat.max));
@@ -921,10 +959,8 @@ function statInfo(sn, path) {
   if (path[path.length - 1] !== "Value") return null;
   const par = getAt(ed.sides[sn].edit, path.slice(0, -1));
   if (!isObj(par) || !("OperationType" in par)) return null;
-  const e = ed.entry?.raw;
-  const max = typeof e?.fusionLimit === "number" ? e.fusionLimit : Array.isArray(e?.levelStats) ? e.levelStats.length - 1 : null;
   const op = String(par.OperationType);
-  return { op, max, pct: !!par.DisplayAsPercent, additive: op === "ADD" || op === "ADD_BASE" || op === "STACKING_MULTIPLY" };
+  return { op, max: modMaxRank(sn), pct: !!par.DisplayAsPercent, additive: scalesWithRank(op) };
 }
 const fmtNum = (x) => String(+x.toFixed(4));
 const statAt = (v, st, rank) => (st.additive ? v * (rank + 1) : v) * (st.pct ? 100 : 1);
@@ -992,7 +1028,7 @@ function node(sn, path, v, flt = treeFilter) {
       acts));
     if (open) {
       const kids = h("div", { class: "kids" }, Object.entries(v).filter(show).map(([kk, x]) => node(sn, [...path, kk], x, sub)));
-      if (arr) kids.append(h("button", { class: "btn btn-ghost add-item", onclick: () => { record(sn, { t: "push", path, v: newItem(sn, path, v) }); refresh(); } }, "+ add item"));
+      if (arr) kids.append(h("button", { class: "btn btn-ghost add-item", onclick: () => { record(sn, { t: "push", path, v: newItem(sn, path, v) }); refresh(); } }, "+ Add item"));
       n.append(kids);
     }
     return n;
@@ -1002,15 +1038,13 @@ function node(sn, path, v, flt = treeFilter) {
   return n;
 }
 
-function restoreAt(sn, path, mirror = []) {
+function restoreAt(sn, path) {
   if (path.length === 1) { resetKey(sn, path[0]); return; }
-  for (const p of [path, ...mirror]) {
-    const base = ed.sides[sn].base;
-    record(sn, hasAt(base, p) ? { t: "set", path: p, v: clone(getAt(base, p)) } : { t: "del", path: p });
-  }
+  const base = ed.sides[sn].base;
+  record(sn, hasAt(base, path) ? { t: "set", path, v: clone(getAt(base, path)) } : { t: "del", path });
   refresh();
 }
-const restoreDot = (sn, path, mirror) => h("button", { class: "dot-btn", type: "button", title: "Restore the original value", onclick: (e) => { e.stopPropagation(); restoreAt(sn, path, mirror); } });
+const restoreDot = (sn, path) => h("button", { class: "dot-btn", type: "button", title: "Restore the original value", onclick: (e) => { e.stopPropagation(); restoreAt(sn, path); } });
 function keyLabel(path, k, inArr, v, dot) {
   const el = h("span", { class: "k", title: path.join(".") }, dot);
   if (inArr) {
@@ -1044,14 +1078,14 @@ function renderSide(sn) {
   const removed = s.ownKeys.filter((k) => !(k in s.edit));
   const removedInh = Object.keys(s.base).filter((k) => !s.ownKeys.includes(k) && !(k in s.edit) && !HIDDEN(k));
   const removedRow = (k) => h("div", { class: "node top removed" }, h("div", { class: "line" },
-    h("span", { class: "tw" }), h("span", { class: "k" }, labelOf(k)), h("span", { class: "sum" }, s.ownKeys.includes(k) ? "removed, the patch will use $clear" : "removed"),
+    h("span", { class: "tw" }), h("span", { class: "k" }, labelOf(k)), h("span", { class: "sum" }, "removed"),
     h("span", { class: "acts" }, h("button", { class: "btn-x", title: "Restore", onclick: () => resetKey(sn, k) }, "↺︎"))));
   const addWrap = h("div", { class: "add-wrap" });
   addWrap.append(h("button", { class: "btn", onclick: (e) => { e.stopPropagation(); openAddMenu(sn, addWrap); } }, "+ Add field"));
   return h("div", { class: "sec", "data-side": sn },
     h("div", { class: "sec-head" },
-      h("div", {}, h("div", { class: "sec-title" }, sn === "all" ? `Shared metadata of ${realSides().length} items` : sn === "item" ? "Item" : "StoreItem"),
-        sn === "all" ? h("div", { class: "muted small" }, "Only values that are identical in every item are shown. Changes apply to all of them, and to their StoreItems wherever the same value exists.") : sn === "store" ? h("code", { class: "muted small" }, s.path) : null),
+      h("div", {}, h("div", { class: "sec-title" }, sn === "all" ? `Shared metadata of ${realSides().length} items` : sn === "item" ? "Item" : "Store item"),
+        sn === "all" ? h("div", { class: "muted small" }, "Only values that are identical in every item are shown. Changes apply to all of them, and to their store items wherever the same value exists.") : sn === "store" ? h("code", { class: "muted small" }, s.path) : null),
       addWrap),
     h("div", { class: "tree" },
       own.filter(match).map((k) => node(sn, [k], s.edit[k])),
@@ -1077,18 +1111,7 @@ function basicLayout(e) {
   const slots = () => Array.isArray(e.ArtifactSlots) && groups.push(["Polarity slots", e.ArtifactSlots.map((_, i) => ["Slot " + (i + 1), ["ArtifactSlots", String(i)]])]);
   const clean = (list) => list.filter(Boolean);
   const groups = [];
-  if (ed.group === "mod" || ed.group === "arcane") {
-    general.push(["Rarity", ["Rarity"]]);
-    if (ed.group === "mod") general.push(["Polarity", ["ArtifactPolarity"]], ["Base drain", ["BaseDrain"]]);
-    general.push(["Max rank", ["FusionLimit"]], ["Compatible with", ["ItemCompatibility"]]);
-    if (ed.group === "arcane") general.push(["Effect duration (s)", ["UpgradeDuration"]]);
-    (Array.isArray(e.Upgrades) ? e.Upgrades : []).forEach((u, i) => {
-      if (!isObj(u)) return;
-      const at = (k) => ["Upgrades", String(i), k];
-      groups.push(["Stat " + (i + 1) + (u.UpgradeType ? ": " + statName(String(u.UpgradeType)) : ""),
-        [["Stat", at("UpgradeType")], "DamageType" in u && (u.DamageType !== "DT_ANY" || /DAMAGE_ADDED|PROC|ELEMENT|RESIST/.test(String(u.UpgradeType))) && ["Damage type", at("DamageType")], ["How it applies", at("OperationType")], ["Value per rank", at("Value")], ["Stat text", at("LocTag")]].filter(Boolean)]);
-    });
-  } else if (ed.group === "suit") {
+  if (ed.group === "suit") {
     general.push(["Passive description", ["PassiveAbilityLocTag"]], ["Health", ["MaxHealthOverride"]], ["Shields", ["MaxShieldOverride"]], ["Armor", ["ArmourRatingOverride"]], ["Max energy", ["MaxEnergy"]], ["Starting energy", ["InitialEnergy"]], ["Sprint speed", ["MovementSpeedMultiplier"]]);
     slots();
     if (Array.isArray(e.AbilityTypes)) groups.push(["Abilities", e.AbilityTypes.map((_, i) => ["Ability " + (i + 1), ["AbilityTypes", String(i)]])]);
@@ -1111,41 +1134,26 @@ function basicLayout(e) {
   }
   return [["General", clean(general)], ...groups];
 }
-function basicRow(sn, label, path, mirror) {
-  const s = ed.sides[sn];
-  const text = path.length === 1 && /^Localize(Desc)?Tag$/.test(path[0]);
-  if (!hasAt(s.edit, path) && !text) return null;
-  const v = hasAt(s.edit, path) ? getAt(s.edit, path) : "";
-  if (isObj(v)) return null;
-  const changed = !hasAt(s.base, path) ? v !== "" : !deepEq(getAt(s.base, path), v);
-  const n = h("div", { class: "node top" + (changed ? " mod" : "") });
-  n.append(h("div", { class: "line" }, h("span", { class: "tw" }), h("span", { class: "k", title: path.join(".") }, restoreDot(sn, path, mirror), h("span", { class: "nm" }, label)), leafWidget(sn, path, v, n, mirror), h("span", { class: "acts" })));
-  n.append(h("div", { class: "loc" }, typeof v === "string" && loc(v) && !n.dataset.shown ? "“" + loc(v) + "”" : ""));
-  return n;
-}
-function renderBasic(sn) {
-  const e = ed.sides[sn].edit;
-  const secs = basicLayout(e).map(([title, rows]) => {
-    const els = rows.map(([label, path, mirror]) => basicRow(sn, label, path, mirror)).filter(Boolean);
-    return els.length ? h("div", { class: "basic-group" }, h("div", { class: "sec-title" }, title), h("div", { class: "tree" }, els)) : null;
-  }).filter(Boolean);
-  return h("div", { class: "sec", "data-side": sn },
-    h("p", { class: "muted small basic-note" }, "The basic editor shows the most common fields. Tick Advanced editor to see and edit everything."),
-    secs.length ? secs : h("div", { class: "empty" }, "Nothing to edit here in the basic editor. Switch to the advanced editor to see every field."));
-}
+const renderBasic = (sn) => (ed.group === "mod" || ed.group === "arcane" ? renderActions(sn) : renderItemActions(sn));
 const syncSide = debounce((sn) => {
   const el = document.querySelector(`#sides .sec[data-side="${sn}"]`);
   if (el && !el.contains(document.activeElement)) el.replaceWith(useBasic() ? renderBasic(sn) : renderSide(sn));
 }, 150);
 
 function renderSides() {
+  syncPreview();
   const basic = useBasic();
   $("#view-edit").classList.toggle("basic", basic);
   $("#adv-toggle").checked = isAdvanced();
   $("#adv-toggle").closest("label").hidden = !BASIC_GROUPS.has(ed.group);
-  if (basic) { $("#sides").replaceChildren(renderBasic(ed.multi ? "all" : "item")); return; }
+  if (basic) {
+    const rules = ed.text.length;
+    $("#sides").replaceChildren(rules ? h("p", { class: "muted small basic-note" }, rules + (rules === 1 ? " find and replace rule" : " find and replace rules") + " from the Advanced editor still apply.") : "", renderBasic(ed.multi ? "all" : "item"));
+    focusActionForm();
+    return;
+  }
   if (ed.multi) { $("#sides").replaceChildren(renderSide("all")); return; }
-  $("#sides").replaceChildren(renderSide("item"), ed.showStore && ed.sides.store ? renderSide("store") : "");
+  $("#sides").replaceChildren(renderSide("item"), ed.sides.store ? renderSide("store") : "");
 }
 function renderFr() {
   $("#fr-list").replaceChildren(...ed.text.map((op, i) => h("div", { class: "chip" },
@@ -1216,10 +1224,14 @@ function openAddMenu(sn, wrap) {
 }
 function closeAddMenu() { addMenu.hidden = true; }
 function resetEditor(state, loading) {
-  ed = { name: "", showStore: false, sides: null, ops: [], text: [], open: new Set(), closed: new Set(), inhOpen: new Set(), ...state };
+  actionForm = null;
+  previewKey = null;
+  $("#card-preview").replaceChildren();
+  ed = { name: "", sides: null, ops: [], text: [], actions: [], redo: [], open: new Set(), closed: new Set(), inhOpen: new Set(), ...state };
   $("#eye-panel").hidden = true;
   $("#target-icon").removeAttribute("src");
   $("#parent-warn").hidden = true;
+  $("#shared-warn").hidden = true;
   $("#sides").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), loading));
   $("#fr").hidden = true;
   $("#fr-list").replaceChildren();
@@ -1235,34 +1247,35 @@ function restoreDraft(draft) {
   if (!draft) return;
   ed.ops = (draft.ops || []).filter((o) => ed.sides[o.side]);
   ed.text = draft.text || [];
+  ed.actions = draft.actions || [];
+  ed.nextAction = draft.nextAction || 0;
   restoreCond(draft.cond);
+  if (ed.ops.length || ed.text.length) toast("Restored your earlier edits");
 }
 async function showEditor(cat, path, eye = null) {
-  resetEditor({ cat, path, eye, group: fieldGroup(cat, eye?.base || path) }, "Loading metadata from warframe-packages-bin-data…");
-  $("#store-opt").hidden = !!eye;
+  resetEditor({ cat, path, eye, group: fieldGroup(cat, eye?.base || path) }, "Loading metadata…");
+  const mine = ed;
   $("#target-path").textContent = path;
-  $("#store-path").textContent = "";
   $("#target-name").textContent = tail(path);
-  $("#also-store").checked = false;
-  $("#also-store").disabled = true;
   const draft = store.get("draft:" + (eye ? "eye:" + eye.mode + ":" : "") + path);
   const src = eye?.base || path;
   let item, storeItem;
   try {
     [item, storeItem] = await Promise.all([loadType(src), eye ? null : loadType(toStorePath(path)), loadDict().catch(() => null)]);
-  } catch (e) {
-    $("#sides").replaceChildren(h("div", { class: "empty" }, "Could not load metadata: " + e.message));
+  } catch {
+    $("#sides").replaceChildren(h("div", { class: "empty" }, OFFLINE));
     return;
   }
-  if (!ed || ed.path !== path) return;
+  if (ed !== mine) return;
   [item, storeItem] = await Promise.all([absolutize(item, src), absolutize(storeItem, toStorePath(path))]);
-  if (!ed || ed.path !== path) return;
+  if (ed !== mine) return;
   if (eye?.mode === "new" && item) item = { ...item, own: {}, parents: [], origin: Object.fromEntries(Object.keys(item.data).map((k) => [k, src])) };
   ed.sides = { item: makeSide(path, item), store: storeItem ? makeSide(toStorePath(path), storeItem) : null };
   if (eye) {
-    const own = await loadType(toStorePath(src));
+    const own = await loadType(toStorePath(src)).catch(() => null);
     const kind = catOfPath(src);
     const g = eye.mode === "new" && own ? { parent: toStorePath(src), category: "" } : await guessStore(src, kind);
+    if (ed !== mine) return;
     const d = eye.mode === "asis" ? item?.data || {} : {};
     eye.hasStore = eye.mode === "asis" && !!own;
     eye.manifest = true;
@@ -1271,32 +1284,26 @@ async function showEditor(cat, path, eye = null) {
     drawEyePanel();
   }
 
-  if (CATS[cat]) try { ed.entry = (await loadList(cat)).find((i) => i.path === src); } catch {}
+  let entry;
+  if (CATS[cat]) try { entry = (await loadList(cat)).find((i) => i.path === src); } catch {}
+  if (ed !== mine) return;
+  ed.entry = entry;
   const name = eye?.mode === "new" ? tail(path) : ed.entry?.name || loc(ed.sides.item.eff.LocalizeTag) || tail(path);
   $("#target-name").textContent = name;
   const icon = ed.entry?.icon || ed.sides.item.eff.Icon;
-  if (icon) {
-    $("#target-icon").style.visibility = "";
-    $("#target-icon").onerror = hideBroken;
-    $("#target-icon").src = IMG + icon;
-  }
-  $("#also-store").disabled = !ed.sides.store;
-  ed.showStore = !!ed.sides.store;
-  $("#also-store").checked = ed.showStore;
-  $("#store-path").textContent = ed.sides.store ? ed.sides.store.path : "(no StoreItem for this type)";
+  if (icon) setIcon($("#target-icon"), icon);
   const base = eye ? null : (item?.parents || []).find(isBaseType);
   $("#parent-warn").replaceChildren(...(base ? [
-    "You also need to edit the parent type (", h("a", { href: "#/edit?c=" + cat + "&p=" + encodeURIComponent(base) }, tail(base)), ") for some changes to take effect.",
+    "Some changes require the parent type (", h("a", { href: "#/edit?c=" + cat + "&p=" + encodeURIComponent(base) }, tail(base)), ") to be edited. All " + tail(base) + " edits also affect " + (ed.group === "suit" ? "its Prime variant." : "variants that inherit from it."),
   ] : []));
   $("#parent-warn").hidden = !base;
-  if (!item) toast("No metadata found for this path in bin-data");
+  if (!item) toast("No metadata found for this path");
   if (eye?.mode === "new") $("#target-path").textContent = path + "  (new, based on " + src + ")";
 
+  ed.defaultName = name;
   ed.name = draft?.name ?? name;
   $("#patch-name").value = ed.name;
   restoreDraft(draft);
-  if (draft && "showStore" in draft) ed.showStore = !!(draft.showStore && ed.sides.store);
-  $("#also-store").checked = ed.showStore;
   replayAll();
   refresh();
 }
@@ -1335,16 +1342,16 @@ function drawEyePanel() {
   el.hidden = false;
   const cats = [...new Set(["", st.category, ...(FIELDS.store?.ProductCategory?.enum || [])])];
   const isNew = e.mode === "new";
-  const same = (what) => (isNew ? "Same as the item " + what : "Plain text or /Lotus/Language/… key");
+  const same = (what) => (isNew ? "Same as the item " + what : "Plain text or a game text key");
   el.replaceChildren(
     isNew ? h("p", { class: "muted small" }, "Only ", h("code", {}, tail(ed.path)), " is created and edited. ", h("code", {}, tail(e.base)), " stays as it is.") : null,
     e.hasStore
-      ? h("p", { class: "muted small" }, "This item already has a StoreItem, so only the store entry is added.")
-      : h("details", { class: "eye-more" }, h("summary", {}, "StoreItem settings"),
+      ? h("p", { class: "muted small" }, "This item already has a store item, so only the store entry is added.")
+      : h("details", { class: "eye-more" }, h("summary", {}, "Store item settings"),
           h("div", { class: "eye-grid" },
-            eyeField("StoreItem path", st.path, (v) => (st.path = v.trim())),
-            eyeField("Parent StoreItem type", st.parent, (v) => (st.parent = v.trim())),
-            st.parent.startsWith("/Lotus/StoreItems/") ? h("span", { class: "muted small eye-note" }, "Category is inherited from the parent StoreItem.") : eyeField("Category", st.category, (v) => (st.category = v), { options: cats }),
+            eyeField("Store item path", st.path, (v) => (st.path = v.trim())),
+            eyeField("Parent store item type", st.parent, (v) => (st.parent = v.trim())),
+            st.parent.startsWith("/Lotus/StoreItems/") ? h("span", { class: "muted small eye-note" }, "Category is inherited from the parent store item.") : eyeField("Category", st.category, (v) => (st.category = v), { options: cats }),
             eyeField("Store name", st.name, (v) => (st.name = v), { placeholder: same("name") }),
             eyeField("Store description", st.desc, (v) => (st.desc = v), { placeholder: same("description") }),
             eyeField("Store icon", st.icon, (v) => (st.icon = v), { placeholder: "/Lotus/Interface/Icons/…" }))),
@@ -1353,7 +1360,6 @@ function drawEyePanel() {
 async function showMulti(cat, paths) {
   resetEditor({ cat, path: paths[0], paths, multi: true, group: fieldGroup(cat, paths[0]) }, "Loading metadata for " + paths.length + " items…");
   $("#target-icon").style.visibility = "hidden";
-  $("#store-opt").hidden = true;
   $("#target-name").textContent = paths.length + " items";
   $("#target-path").textContent = paths.join("  &  ");
   const draft = store.get("draft:multi:" + paths.join("|"));
@@ -1362,13 +1368,13 @@ async function showMulti(cat, paths) {
     await loadDict().catch(() => null);
     types = await Promise.all(paths.map(async (p) => absolutize(await loadType(p), p)));
     stores = await Promise.all(paths.map(async (p) => (p.startsWith("/Lotus/StoreItems/") ? null : absolutize(await loadType(toStorePath(p)), toStorePath(p)))));
-  } catch (e) {
-    $("#sides").replaceChildren(h("div", { class: "empty" }, "Could not load metadata: " + e.message));
+  } catch {
+    $("#sides").replaceChildren(h("div", { class: "empty" }, OFFLINE));
     return;
   }
   if (!ed || ed.paths !== paths) return;
   const missing = paths.filter((_, i) => !types[i]);
-  if (missing.length) toast("Not found in bin-data: " + missing.map(tail).join(", "));
+  if (missing.length) toast("Not found in the game data: " + missing.map(tail).join(", "));
   ed.sides = {};
   paths.forEach((p, i) => {
     ed.sides["m" + i] = makeSide(p, types[i]);
@@ -1376,9 +1382,11 @@ async function showMulti(cat, paths) {
   });
   ed.sides.all = { path: "", origin: {}, ownKeys: [] };
   const byPath = new Map((await loadAllLists()).map((i) => [i.path, i.name]));
+  if (!ed || ed.paths !== paths) return;
   const names = paths.map((p) => byPath.get(p) || tail(p));
   $("#target-name").textContent = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
-  ed.name = draft?.name ?? names.join(", ");
+  ed.defaultName = names.join(", ");
+  ed.name = draft?.name ?? ed.defaultName;
   $("#patch-name").value = ed.name;
   restoreDraft(draft);
   replayAll();
@@ -1387,7 +1395,9 @@ async function showMulti(cat, paths) {
 function syncCond() {
   const on = $("#cond-on").checked;
   $("#cond-opts").hidden = !on;
-  $("#cond-ver").hidden = !on || $("#cond-mode").value === "newtypes";
+  const noVersion = $("#cond-mode").value === "newtypes";
+  $("#cond-ver").hidden = !on || noVersion;
+  $("#cond-warn").hidden = !on || noVersion || !!$("#cond-ver").value.trim();
 }
 
 function initEditor() {
@@ -1411,8 +1421,7 @@ function initEditor() {
   $("#cond-ver-list").append(...VERSIONS.map((x) => h("option", { value: x.v }, x.l)));
   $("#cond-mode").addEventListener("change", () => { syncCond(); renderOutput(); });
   $("#cond-on").addEventListener("change", () => { syncCond(); renderOutput(); });
-  $("#cond-ver").addEventListener("input", renderOutput);
-  $("#also-store").addEventListener("change", (e) => { if (ed.multi) return; ed.showStore = e.target.checked && !!ed.sides?.store; renderSides(); saveDraft(); });
+  $("#cond-ver").addEventListener("input", () => { syncCond(); renderOutput(); });
   $("#key-filter").addEventListener("input", debounce(() => { if (!ed?.sides) return; ed.closed.clear(); renderSides(); }, 120));
   $("#adv-toggle").addEventListener("change", (e) => { store.set("advancedEditor", e.target.checked); if (ed?.sides) renderSides(); });
   $("#btn-fr").onclick = () => { $("#fr").hidden = !$("#fr").hidden; if (!$("#fr").hidden) $("#fr-from").focus(); };
@@ -1427,17 +1436,18 @@ function initEditor() {
     replayAll();
     refresh();
   };
-  $("#btn-copy").onclick = async () => {
-    try { await navigator.clipboard.writeText(buildPatch()); toast("Copied"); } catch { toast("Copy failed"); }
+  $("#btn-reset").onclick = () => {
+    if (!ed?.sides || !confirm("Reset every change to this item? This can't be undone.")) return;
+    ed.ops = [];
+    ed.text = [];
+    ed.actions = [];
+    ed.redo = [];
+    actionForm = null;
+    replayAll();
+    refresh();
   };
-  $("#btn-save").onclick = () => {
-    if (!ed?.sides) return;
-    const name = (ed.name || tail(ed.path)).replace(/[\\/:*?"<>|]+/g, "_").trim() || "Untitled";
-    const url = URL.createObjectURL(new Blob([buildPatch()], { type: "text/plain" }));
-    h("a", { href: url, download: name + ".txt" }).click();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    toast("Saved " + name + ".txt");
-  };
+  $("#btn-copy").onclick = () => copyText(buildPatch());
+  $("#btn-save").onclick = () => { if (ed?.sides) saveText(ed.name || tail(ed.path), buildPatch(), "Untitled"); };
 }
 function namePaths(items, byName) {
   const count = new Map();
@@ -1449,10 +1459,9 @@ function namePaths(items, byName) {
 function pathSearch(input, load) {
   const box = h("div", { class: "sugg path-sugg", hidden: true });
   input.after(box);
-  let data = null, items = [], sel = -1;
-  const close = () => { box.hidden = true; sel = -1; };
-  const mark = () => items.forEach((b, i) => b.classList.toggle("sel", i === sel));
-  const pick = (i) => { input.value = i.name; close(); input.dispatchEvent(new Event("change")); };
+  const list = suggestBox(input, box);
+  let data = null;
+  const choose = (i) => { input.value = i.name; list.close(); input.dispatchEvent(new Event("change")); };
   input.addEventListener("focus", async () => { data ||= await load(); });
   input.addEventListener("input", debounce(async () => {
     const q = input.value.trim().toLowerCase();
@@ -1462,24 +1471,8 @@ function pathSearch(input, load) {
       const rank = n === q ? 0 : at === 0 ? 1 : at > 0 ? 2 : i.path.toLowerCase().includes(q) ? 3 : -1;
       return [rank, i];
     }).filter(([r]) => r >= 0).sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length).slice(0, 12);
-    items = hits.map(([, i]) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); pick(i); } }, h("span", { class: "pn" }, i.shown || i.name, i.flag ? flagIcon(i.flag) : null), h("span", { class: "pp" }, i.path.replace(/^\/Lotus\//, ""))));
-    box.replaceChildren(...items);
-    box.hidden = !items.length;
-    sel = -1;
+    list.show(hits.map(([, i]) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); choose(i); } }, h("span", { class: "pn" }, i.shown || i.name, i.flag ? flagIcon(i.flag) : null), h("span", { class: "pp" }, i.path.replace(/^\/Lotus\//, "")))));
   }, 120));
-  input.addEventListener("keydown", (e) => {
-    if (box.hidden) return;
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      sel = Math.max(0, Math.min(items.length - 1, sel + (e.key === "ArrowDown" ? 1 : -1)));
-      mark();
-      items[sel]?.scrollIntoView({ block: "nearest" });
-    } else if (e.key === "Enter" && sel >= 0) {
-      e.preventDefault();
-      items[sel].dispatchEvent(new MouseEvent("mousedown"));
-    } else if (e.key === "Escape") close();
-  });
-  input.addEventListener("blur", close);
 }
 function initEye() {
   const input = $("#eye-path"), np = $("#eye-newpath"), status = $("#eye-status");
@@ -1503,12 +1496,17 @@ function initEye() {
     const target = resolve();
     if (!target) return;
     status.innerHTML = '<span class="spinner"></span>Looking up ' + esc(target) + "…";
-    if (!(await loadType(target))) { status.textContent = target + " was not found in warframe-packages-bin-data."; return; }
+    const lookup = (p) => loadType(p).then((t) => ({ t }), () => { status.textContent = OFFLINE; return null; });
+    const found = await lookup(target);
+    if (!found) return;
+    if (!found.t) { status.textContent = target + " was not found in the game data."; return; }
     if (mode() === "asis") { status.textContent = ""; location.hash = "#/edit?eye=asis&p=" + encodeURIComponent(target); return; }
     if (mode() === "skin") { status.textContent = ""; location.hash = "#/skin?p=" + encodeURIComponent(target); return; }
     const newPath = normalizePath(np.value);
     if (!newPath || newPath === target) { status.textContent = "Give the new item its own path."; return; }
-    if (await loadType(newPath)) { status.textContent = newPath + " already exists. Pick another path, or use \"Make it obtainable as it is\"."; return; }
+    const taken = await lookup(newPath);
+    if (!taken) return;
+    if (taken.t) { status.textContent = newPath + " already exists. Pick another path, or use \"Make it obtainable as it is\"."; return; }
     status.textContent = "";
     location.hash = "#/edit?eye=new&base=" + encodeURIComponent(target) + "&p=" + encodeURIComponent(newPath);
   };
@@ -1546,6 +1544,8 @@ function braceDepth(str) {
   }
   return d;
 }
+const ONE_LINE_OBJECT = /\{[^{}]*=[^{}]*\}/;
+const ONE_LINE_MESSAGE = "One-line objects do not work in a new type (+) patch. Put each field on its own line.";
 function parsePatchText(text) {
   const diags = [];
   const add = (line, sev, msg) => diags.push({ line, sev, msg });
@@ -1674,6 +1674,7 @@ function parsePatchText(text) {
     } else if (t && !t.startsWith("#")) {
       if (!inScope(ln, false)) return;
       if (patch.depth > 0) {
+        if (patch.newType && ONE_LINE_OBJECT.test(t)) add(ln, "error", ONE_LINE_MESSAGE);
         if (t.startsWith("{") && patch.prevVal?.endsWith("}")) add(ln, "error", "A comma is missing after the <code>}</code> on the line above. List entries must be separated by <code>},</code> or the game can softlock.");
         patch.prevVal = t;
         patch.depth += braceDepth(t);
@@ -1685,6 +1686,7 @@ function parsePatchText(text) {
       const key = t.slice(0, eq).trim(), val = t.slice(eq + 1).trim();
       if (patch.prefix.some((x) => x.key === key)) add(ln, "warning", `<code>${esc(key)}</code> is set twice in this patch. Only the first one is used.`);
       if (val === "") add(ln, "warning", `<code>${esc(key)}</code> is given an empty value.`);
+      if (patch.newType && ONE_LINE_OBJECT.test(val)) add(ln, "error", ONE_LINE_MESSAGE);
       const d = braceDepth(val);
       if (d < 0) add(ln, "error", "There are more } than {.");
       if (d > 0) { patch.depth = d; patch.depthLine = ln; }
@@ -1721,6 +1723,9 @@ async function verifyPatch(parsed) {
     uses.get(k).push({ p, ln: p.keyLines[i] });
   });
   const newTypes = new Set(parsed.patches.filter((p) => p.newType).map((p) => p.newType.path));
+  await Promise.all(parsed.patches.filter((p) => p.newType?.parent.startsWith("/") && !newTypes.has(p.newType.parent)).map(async (p) => {
+    if (!(await loadType(p.newType.parent))) add(p.newType.line, "error", `The parent <code>${esc(p.newType.parent)}</code> does not exist in the game data.`);
+  }));
   await Promise.all([...uses].map(async ([path, list]) => {
     const t = await loadType(path);
     if (!t) {
@@ -1728,7 +1733,7 @@ async function verifyPatch(parsed) {
       return;
     }
     if (newTypes.has(path)) add(list[0].ln, "warning", `<code>${esc(tail(path))}</code> already exists, so the + line will not create it.`);
-    const own = t.own, raw = eeText(own), name = esc(tail(path) + (path.startsWith("/Lotus/StoreItems/") ? " (StoreItem)" : ""));
+    const own = t.own, raw = eeText(own), name = esc(tail(path) + (path.startsWith("/Lotus/StoreItems/") ? " (store item)" : ""));
     if (!Object.keys(t.data).length) {
       if (list.some(({ p }) => p.q.length || p.a.length || p.r.length || p.s.length)) add(list[0].ln, "info", `The game data has no fields for ${name}, so its lines can't be checked here.`);
       return;
@@ -1834,7 +1839,7 @@ function initCheck() {
     if (!parsed.patches.length) { draw(parsed.diags, false); return; }
     draw(parsed.diags.slice(), true);
     let online = [];
-    try { online = await verifyPatch(parsed); } catch (e) { online = [{ line: 1, sev: "warning", msg: "Could not reach the game data: " + esc(e.message) }]; }
+    try { online = await verifyPatch(parsed); } catch { online = [{ line: 1, sev: "warning", msg: OFFLINE }]; }
     if (id === run) draw([...parsed.diags, ...online], false);
   }, 450);
   ta.addEventListener("input", check);
@@ -1889,7 +1894,7 @@ const glowFrom = (rgb) => {
 };
 async function analyzeCharacter(path) {
   const t = await loadType(path);
-  if (!t) return { error: path + " was not found in warframe-packages-bin-data." };
+  if (!t) return { error: path + " was not found in the game data." };
   const d = t.data, at = (k) => t.origin[k] || path;
   if (!d.Mesh) return { error: "This character has no body of its own, so it can't be turned into a skin." };
   const matKey = d.OverrideMaterials ? "OverrideMaterials" : "OverrideMaterial";
@@ -1913,18 +1918,18 @@ async function analyzeCharacter(path) {
     const glow = mt?.data["PS:EmissiveTintColorHi"];
     const own = !!mt && "PS:EmissiveTintColorHi" in mt.own;
     if (glow && hueOf(glow) !== hueOf(color)) {
-      if (own && scriptColor) note = "Its energy colour is set by a fight script, not by its material, so the skin keeps the material's own glow colour.";
+      if (own && scriptColor) note = "Its energy color is set by a fight script, not by its material, so the skin keeps the material's own glow color.";
       else fix = { material: mats[0], ...glowFrom(rgbOf(color)) };
     }
   }
   const name = loc(d.LocalizeTag) || loc(d.LocTag) || tail(path);
-  return { path, name: name.replace(/<[^>]+>\s*/g, ""), icon: d.Icon || "", mesh: d.Mesh, mats, head, parts, fix, note };
+  return { path, name: stripTags(name), icon: d.Icon || "", mesh: d.Mesh, mats, head, parts, fix, note };
 }
 const WEAPON_ROOTS = { LotusLongGun: "Every primary weapon", LotusPistol: "Every secondary weapon", PlayerMeleeWeapon: "Every melee weapon" };
 const WEAPON_SKIN = "/Lotus/Types/Game/LotusWeaponCustomization";
 async function analyzeWeapon(path) {
   const t = await loadType(path);
-  if (!t) return { error: path + " was not found in warframe-packages-bin-data." };
+  if (!t) return { error: path + " was not found in the game data." };
   if (!t.data.PickUpMesh) return { error: "This weapon has no model listed in its data, so it can't be turned into a skin." };
   const item = (await loadList("weapon").catch(() => [])).find((i) => i.path === path);
   return {
@@ -1933,29 +1938,44 @@ async function analyzeWeapon(path) {
     root: t.parents.find((p) => tail(p) in WEAPON_ROOTS), category: item?.raw.productCategory,
   };
 }
-function drawWeaponSkinForm(weapons) {
-  const info = sk.info;
+const skinFields = (fields) => fields.filter(Boolean).map(([k, v]) => indent(k + "=" + (typeof v === "string" && v.startsWith("/") ? v : eeValue(v))));
+const skinBlock = (head, fields) => [head, ...skinFields(fields)];
+const skinStore = (path, type, name, extra = []) => skinBlock(`+${path}|${CUSTOMIZATION_STORE}`, [["ProductCategory", "WeaponSkins"], ["LocalizeTag", name], sk.info.icon && ["Icon", sk.info.icon], ["TypeName", type], ["Compatible", sk.target], ["AlwaysAvailable", 1], ["ShowInMarket", 1], ["RegularPrice", 1], ["Giftable", 0], ["AvailableOnPvp", 1], ...extra]);
+function skinNameField() {
   const name = h("input", { class: "input", value: sk.name, spellcheck: "false", autocomplete: "off" });
   name.addEventListener("input", () => { sk.name = name.value; renderSkin(); });
+  return field("Skin name", name);
+}
+function skinTargetField(label, target) {
+  target.addEventListener("change", () => { sk.target = target.value; renderSkin(); });
+  return field(label, target);
+}
+function drawWeaponSkinForm(weapons) {
+  const info = sk.info;
   const opt = (value, label) => h("option", { value, selected: value === sk.target }, label);
   const target = h("select", { class: "input" },
     info.root ? opt(info.root, WEAPON_ROOTS[tail(info.root)]) : null,
     h("optgroup", { label: "One weapon" }, weapons.map((w) => opt(w.path, w.name))));
-  target.addEventListener("change", () => { sk.target = target.value; renderSkin(); });
   $("#skin-form").replaceChildren(
-    h("label", { class: "eye-field" }, h("span", { class: "label" }, "Skin name"), name),
-    h("label", { class: "eye-field" }, h("span", { class: "label" }, "Who can use it"), target),
-    h("p", { class: "muted small" }, "The skin shows the " + info.name + " model. The grip and animations still come from the weapon wearing it, so very different weapons may hold it oddly."));
+    skinNameField(),
+    skinTargetField("Who can use it", target));
+}
+const weaponSkinKey = (label) => label.replace(/[^A-Za-z0-9]/g, "") || "CustomWeaponSkin";
+function drawSkinNote() {
+  const note = $("#skin-note"), weapon = sk?.info?.kind === "weapon";
+  note.hidden = !weapon;
+  if (!weapon) return;
+  note.replaceChildren("Add the item to your inventory using WebUI (raw path) or buy it in the market in-game for 1 ",
+    h("img", { class: "credit-icon", src: IMG + "/Lotus/Interface/Icons/StoreIcons/Currency/CreditsLarge.png", alt: "credit", onerror: hideBroken }), ". Not owning the skin will revert to default weapon appearance.");
 }
 function buildWeaponSkin() {
   const info = sk.info;
   const label = sk.name.trim() || info.name + " Skin";
-  const key = label.replace(/[^A-Za-z0-9]/g, "") || "CustomWeaponSkin";
+  const key = weaponSkinKey(label);
   const sp = SKIN_DIR + key, ssp = SKIN_STORE_DIR + key;
-  const lines = (fields) => fields.filter(Boolean).map(([k, v]) => indent(k + "=" + (typeof v === "string" && v.startsWith("/") ? v : eeValue(v))));
   const out = ["# " + label, "$if can_add_new_types()", "",
-    `+${sp}|${WEAPON_SKIN}`, ...lines([["LocalizeTag", label], info.icon && ["Icon", info.icon], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["AvailableOnPvp", 1], ["Weapon", sk.target], ["THIRD_PERSON_MeshOverride", info.mesh]]), "",
-    `+${ssp}|${CUSTOMIZATION_STORE}`, ...lines([["ProductCategory", "WeaponSkins"], ["LocalizeTag", label], info.icon && ["Icon", info.icon], ["TypeName", sp], ["Compatible", sk.target], ["AlwaysAvailable", 1], ["ShowInMarket", 1], ["RegularPrice", 1], ["Giftable", 0], ["AvailableOnPvp", 1]]), "",
+    ...skinBlock(`+${sp}|${WEAPON_SKIN}`, [["LocalizeTag", label], info.icon && ["Icon", info.icon], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["AvailableOnPvp", 1], ["Weapon", sk.target], ["THIRD_PERSON_MeshOverride", info.mesh]]), "",
+    ...skinStore(ssp, sp, label), "",
     ">" + MANIFEST, indent("a|StoreItems|" + ssp), "$endif"];
   return out.join("\n") + "\n";
 }
@@ -1966,9 +1986,10 @@ async function showSkin(path) {
   $("#skin-path").textContent = path;
   $("#skin-icon").removeAttribute("src");
   $("#skin-output").innerHTML = "";
-  $("#skin-form").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), "Reading it from warframe-packages-bin-data…"));
+  $("#skin-note").hidden = true;
+  $("#skin-form").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), "Reading the game data…"));
   const weapon = path.startsWith("/Lotus/Weapons/");
-  const [info, chars] = await Promise.all([weapon ? analyzeWeapon(path) : analyzeCharacter(path), loadCharacters(), loadDict().catch(() => null)]);
+  const [info, chars] = await Promise.all([(weapon ? analyzeWeapon(path) : analyzeCharacter(path)).catch(() => ({ error: OFFLINE })), loadCharacters(), loadDict().catch(() => null)]);
   if (!sk || sk.path !== path) return;
   if (info.error) { $("#skin-form").replaceChildren(h("div", { class: "empty" }, info.error)); return; }
   if (weapon) {
@@ -1976,7 +1997,7 @@ async function showSkin(path) {
     sk.name = info.name + " Skin";
     sk.target = info.root || path;
     $("#skin-title").textContent = info.name;
-    if (info.icon) { $("#skin-icon").style.visibility = ""; $("#skin-icon").onerror = hideBroken; $("#skin-icon").src = IMG + info.icon; }
+    if (info.icon) setIcon($("#skin-icon"), info.icon);
     const all = await loadList("weapon").catch(() => []);
     if (!sk || sk.path !== path) return;
     drawWeaponSkinForm(all.filter((w) => w.raw.productCategory === info.category));
@@ -1991,16 +2012,13 @@ async function showSkin(path) {
   sk.parts = info.head.length ? "both" : "body";
   info.parts.forEach((c, i) => { if (!isFx(c.Type)) sk.picked.add(i); });
   $("#skin-title").textContent = info.name;
-  if (info.icon) { $("#skin-icon").style.visibility = ""; $("#skin-icon").onerror = hideBroken; $("#skin-icon").src = IMG + info.icon; }
+  if (info.icon) setIcon($("#skin-icon"), info.icon);
   drawSkinForm(chars.suits);
   renderSkin();
 }
 function drawSkinForm(suits) {
   const info = sk.info;
-  const name = h("input", { class: "input", value: sk.name, spellcheck: "false", autocomplete: "off" });
-  name.addEventListener("input", () => { sk.name = name.value; renderSkin(); });
   const target = h("select", { class: "input" }, h("option", { value: ALL_SUITS }, "Every Warframe"), suits.map((s) => h("option", { value: s.path, selected: s.path === sk.target }, s.name)));
-  target.addEventListener("change", () => { sk.target = target.value; renderSkin(); });
   const check = (label, on, set) => {
     const box = h("input", { type: "checkbox", checked: on });
     box.addEventListener("change", () => { set(box.checked); renderSkin(); });
@@ -2013,8 +2031,8 @@ function drawSkinForm(suits) {
     return where ? where.charAt(0).toUpperCase() + where.slice(1) + " piece (" + what + ")" : what;
   };
   $("#skin-form").replaceChildren(...[
-    h("label", { class: "eye-field" }, h("span", { class: "label" }, "Skin name"), name),
-    h("label", { class: "eye-field" }, h("span", { class: "label" }, "Who can wear it"), target),
+    skinNameField(),
+    skinTargetField("Who can wear it", target),
     h("div", { class: "skin-list" }, h("span", { class: "label" }, "What to include"),
       info.head.length ? [["both", "Body and helmet"], ["body", "Body only"], ["helmet", "Helmet only"]].map(([v, l]) => {
         const r = h("input", { type: "radio", name: "skin-parts", value: v, checked: sk.parts === v });
@@ -2023,7 +2041,7 @@ function drawSkinForm(suits) {
       }) : h("span", { class: "muted small" }, "Body only. This character has no separate head piece.")),
     info.parts.length && sk.parts !== "helmet" ? h("div", { class: "skin-list" }, h("span", { class: "label" }, "Attachments"),
       info.parts.map((c, i) => check(partName(c) + (isFx(c.Type) ? " (effect)" : ""), sk.picked.has(i), (v) => (v ? sk.picked.add(i) : sk.picked.delete(i))))) : null,
-    info.fix && sk.parts !== "helmet" ? h("p", { class: "muted small" }, "The body material inherits a different glow colour, so the patch also sets the right one on ", h("code", {}, tail(info.fix.material)), ". Only things that use this material are affected.") : null,
+    info.fix && sk.parts !== "helmet" ? h("p", { class: "muted small" }, "The body material inherits a different glow color, so the patch also sets the right one on ", h("code", {}, tail(info.fix.material)), ". Only things that use this material are affected.") : null,
     info.note && sk.parts !== "helmet" ? h("p", { class: "warn" }, info.note) : null].filter(Boolean));
 }
 function buildSkin() {
@@ -2034,18 +2052,16 @@ function buildSkin() {
   const vp = SKIN_DIR + key + "Variant", sp = SKIN_DIR + key, hp = SKIN_DIR + key + "Helmet";
   const ssp = SKIN_STORE_DIR + key, shp = SKIN_STORE_DIR + key + "Helmet";
   const who = all ? [["Weapon", ALL_SUITS], ["GenericCompatible", ALL_SUITS]] : [["Weapon", sk.target]];
-  const block = (head, fields) => [head, ...fields.filter(Boolean).map(([k, v]) => indent(k + "=" + (typeof v === "string" && v.startsWith("/") ? v : eeValue(v))))];
-  const store = (path, type, name, extra = []) => block(`+${path}|${CUSTOMIZATION_STORE}`, [["ProductCategory", "WeaponSkins"], ["LocalizeTag", name], info.icon && ["Icon", info.icon], ["TypeName", type], ["Compatible", sk.target], ["AlwaysAvailable", 1], ["ShowInMarket", 1], ["RegularPrice", 1], ["Giftable", 0], ["AvailableOnPvp", 1], ...extra]);
   const body = sk.parts !== "helmet";
   const helmet = sk.parts !== "body" && info.head.length > 0;
-  const blocks = body ? [block(`+${vp}|/EE/Types/Game/WeaponSkin`, [["TpMeshOverride", info.mesh], info.mats.length && ["TpMaterialOverrides", info.mats]])] : [];
+  const blocks = body ? [skinBlock(`+${vp}|/EE/Types/Game/WeaponSkin`, [["TpMeshOverride", info.mesh], info.mats.length && ["TpMaterialOverrides", info.mats]])] : [];
   const helmetName = label.replace(/\s*Skin$/i, "") + " Helmet";
   if (helmet) {
-    blocks.push(block(`+${hp}|${CUSTOMIZATION}`, [["LocalizeTag", helmetName], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["ExcludeFromCodex", 0], ...who, ["THIRD_PERSON_Attachment", { UpgradeAutoChildren: info.head }]]));
-    blocks.push(store(shp, hp, helmetName, [["ExcludeFromCodex", 0]]));
+    blocks.push(skinBlock(`+${hp}|${CUSTOMIZATION}`, [["LocalizeTag", helmetName], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["ExcludeFromCodex", 0], ...who, ["THIRD_PERSON_Attachment", { UpgradeAutoChildren: info.head }]]));
+    blocks.push(skinStore(shp, hp, helmetName, [["ExcludeFromCodex", 0]]));
   }
-  if (body) blocks.push(block(`+${sp}|${CUSTOMIZATION}`, [["LocalizeTag", label], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ...who, ["UpgradeSkinOverride", vp], ["CompatibleSlots", ["BodySkin"]], ["AllowUglyMode", 1], helmet && ["ForcedCustomizations", { Helmet: hp }], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", info.parts.filter((_, i) => sk.picked.has(i))]]));
-  if (body) blocks.push(store(ssp, sp, label, [["CompatibleSlots", ["BodySkin"]]]));
+  if (body) blocks.push(skinBlock(`+${sp}|${CUSTOMIZATION}`, [["LocalizeTag", label], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ...who, ["UpgradeSkinOverride", vp], ["CompatibleSlots", ["BodySkin"]], ["AllowUglyMode", 1], helmet && ["ForcedCustomizations", { Helmet: hp }], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", info.parts.filter((_, i) => sk.picked.has(i))]]));
+  if (body) blocks.push(skinStore(ssp, sp, label, [["CompatibleSlots", ["BodySkin"]]]));
   blocks.push([">" + MANIFEST, ...(body ? [indent("a|StoreItems|" + ssp)] : []), ...(helmet ? [indent("a|StoreItems|" + shp)] : [])]);
   const out = ["# " + (body ? label : helmetName), "$if can_add_new_types()"];
   blocks.forEach((b) => out.push("", ...b));
@@ -2055,20 +2071,11 @@ function buildSkin() {
 }
 function renderSkin() {
   if (sk?.info) $("#skin-output").innerHTML = highlight(buildSkin());
+  drawSkinNote();
 }
 function initSkin() {
-  $("#skin-copy").onclick = async () => {
-    if (!sk?.info) return;
-    try { await navigator.clipboard.writeText(buildSkin()); toast("Copied"); } catch { toast("Copy failed"); }
-  };
-  $("#skin-save").onclick = () => {
-    if (!sk?.info) return;
-    const name = (sk.name || "Skin").replace(/[\\/:*?"<>|]+/g, "_").trim() || "Skin";
-    const url = URL.createObjectURL(new Blob([buildSkin()], { type: "text/plain" }));
-    h("a", { href: url, download: name + ".txt" }).click();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    toast("Saved " + name + ".txt");
-  };
+  $("#skin-copy").onclick = () => { if (sk?.info) copyText(buildSkin()); };
+  $("#skin-save").onclick = () => { if (sk?.info) saveText(sk.name || "Skin", buildSkin(), "Skin"); };
 }
 function route() {
   const hash = location.hash || "#/";
@@ -2106,14 +2113,3 @@ function route() {
     show("view-home");
   }
 }
-initHome();
-initEditor();
-initBlank();
-initEye();
-initSkin();
-initMulti();
-initCheck();
-$("#cats").addEventListener("click", (e) => { if (e.target.dataset.cat) location.hash = "#/pick/" + e.target.dataset.cat; });
-$("#search").addEventListener("input", debounce(filterPicker, 120));
-window.addEventListener("hashchange", route);
-route();
