@@ -1,6 +1,6 @@
 window.TEXT = {
   appName: "Metadata Patch Builder",
-  checkPatch: "Check my patch",
+  checkPatch: "Verify your patch",
   sentientBuilder: "Sentient Builder",
   newPatch: "New patch",
   output: "Output",
