@@ -1951,7 +1951,7 @@ function loadCharacters() {
   return charsPromise;
 }
 const relTo = (base, v) => (typeof v === "string" && v && !v.startsWith("/") ? base.slice(0, base.lastIndexOf("/") + 1) + v : v);
-const isFx = (type) => /\/Fx\//.test(type) || /Smoke|Spark|Glow|Trail|Fx/i.test(tail(type));
+const isFx = (type) => /\/(Fx|Sounds)\//.test(type) || /Smoke|Spark|Glow|Trail|Fx|Handler$/i.test(tail(type));
 const rgbOf = (c) => (Array.isArray(c) && c.length >= 3 ? c.slice(0, 3).map(Number) : null);
 const hueOf = (c) => { const v = rgbOf(c); return v ? v.indexOf(Math.max(...v)) : -1; };
 const glowFrom = (rgb) => {
@@ -2031,7 +2031,7 @@ function drawSkinNote() {
   const note = $("#skin-note"), weapon = sk?.info?.kind === "weapon";
   note.hidden = !weapon;
   if (!weapon) return;
-  note.replaceChildren("Add the item to your inventory using WebUI (raw path) or buy it in the market in-game for 1 ",
+  note.replaceChildren("Add the item to your inventory using WebUI (Raw) or buy it in the market in-game for 1 ",
     h("img", { class: "credit-icon", src: IMG + "/Lotus/Interface/Icons/StoreIcons/Currency/CreditsLarge.png", alt: "credit", onerror: hideBroken }), ". Not owning the skin will revert to default weapon appearance.");
 }
 function buildWeaponSkin() {
@@ -2047,7 +2047,7 @@ function buildWeaponSkin() {
 }
 let sk = null;
 async function showSkin(path) {
-  sk = { path, info: null, name: "", target: ALL_SUITS, parts: "both", picked: new Set() };
+  sk = { path, info: null, name: "", target: ALL_SUITS, parts: "both", lockHelmet: true, picked: new Set() };
   $("#skin-title").textContent = tail(path);
   $("#skin-path").textContent = path;
   $("#skin-icon").removeAttribute("src");
@@ -2104,7 +2104,8 @@ function drawSkinForm(suits) {
         const r = h("input", { type: "radio", name: "skin-parts", value: v, checked: sk.parts === v });
         r.addEventListener("change", () => { sk.parts = v; drawSkinForm(suits); renderSkin(); });
         return h("label", { class: "check" }, r, h("span", {}, l));
-      }) : h("span", { class: "muted small" }, "Body only. This character has no separate head piece.")),
+      }) : h("span", { class: "muted small" }, "Body only. This character has no separate helmet.")),
+    info.head.length && sk.parts === "both" ? check("Lock the helmet to this skin", sk.lockHelmet, (v) => (sk.lockHelmet = v)) : null,
     info.parts.length && sk.parts !== "helmet" ? h("div", { class: "skin-list" }, h("span", { class: "label" }, "Attachments"),
       info.parts.map((c, i) => check(partName(c) + (isFx(c.Type) ? " (effect)" : ""), sk.picked.has(i), (v) => (v ? sk.picked.add(i) : sk.picked.delete(i))))) : null,
     info.fix && sk.parts !== "helmet" ? h("p", { class: "muted small" }, "The body material inherits a different glow color, so the patch also sets the right one on ", h("code", {}, tail(info.fix.material)), ". Only things that use this material are affected.") : null,
@@ -2126,7 +2127,7 @@ function buildSkin() {
     blocks.push(skinBlock(`+${hp}|${CUSTOMIZATION}`, [["LocalizeTag", helmetName], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["ExcludeFromCodex", 0], ...who, ["THIRD_PERSON_Attachment", { UpgradeAutoChildren: info.head }]]));
     blocks.push(skinStore(shp, hp, helmetName, [["ExcludeFromCodex", 0]]));
   }
-  if (body) blocks.push(skinBlock(`+${sp}|${CUSTOMIZATION}`, [["LocalizeTag", label], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ...who, ["UpgradeSkinOverride", vp], ["CompatibleSlots", ["BodySkin"]], ["AllowUglyMode", 1], helmet && ["ForcedCustomizations", { Helmet: hp }], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", info.parts.filter((_, i) => sk.picked.has(i))]]));
+  if (body) blocks.push(skinBlock(`+${sp}|${CUSTOMIZATION}`, [["LocalizeTag", label], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ...who, ["UpgradeSkinOverride", vp], ["CompatibleSlots", ["BodySkin"]], ["AllowUglyMode", 1], helmet && sk.lockHelmet && ["ForcedCustomizations", { Helmet: hp }], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", info.parts.filter((_, i) => sk.picked.has(i))]]));
   if (body) blocks.push(skinStore(ssp, sp, label, [["CompatibleSlots", ["BodySkin"]]]));
   blocks.push([">" + MANIFEST, ...(body ? [indent("a|StoreItems|" + ssp)] : []), ...(helmet ? [indent("a|StoreItems|" + shp)] : [])]);
   const out = ["# " + (body ? label : helmetName), "$if can_add_new_types()"];
