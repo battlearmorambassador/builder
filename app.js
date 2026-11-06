@@ -155,7 +155,7 @@ function getJSON(url) {
 }
 
 let DICT = null;
-const loadDict = () => getJSON(PEP + "/dict.en.json").then((d) => (DICT = d));
+const loadDict = () => getJSON(PEP + "/dict.en.json").then((d) => { for (const c of PLAYABLE) if (c.name) d[c.tag] ||= c.name; DICT = d; });
 const FIELDS = window.FIELDS_DATA || {};
 const VERSION_SOURCE = "https://raw.githubusercontent.com/spaceninjaserver/about.openwf.io/main/versions.php";
 async function loadBuilds() {
@@ -737,7 +737,9 @@ function buildEye() {
   if (e.manifest) block([">" + MANIFEST], ["a|StoreItems|" + st.path]);
   const gated = inner.length && conditionExpr() !== "can_add_new_types()";
   out.push(...(gated ? ["$if can_add_new_types()", ...inner, "$endif"] : inner));
-  if (e.mode === "asis" && lines.length) out.push("", ">" + ed.path, ...lines.map(indent));
+  if (e.unlock?.store.length) out.push("", ">" + st.path, ...e.unlock.store.map(indent));
+  const own = e.unlock?.market ? ["MarketMode=MM_VISIBLE", ...lines.filter((l) => !l.startsWith("MarketMode="))] : lines;
+  if (e.mode === "asis" && own.length) out.push("", ">" + ed.path, ...own.map(indent));
   return finish(out);
 }
 function finish(out) {
@@ -1339,6 +1341,8 @@ async function showEditor(cat, path, eye = null) {
     if (ed !== mine) return;
     const d = eye.mode === "asis" ? item?.data || {} : {};
     eye.hasStore = eye.mode === "asis" && !!own;
+    const hidden = own?.data.ShowInMarket === 0;
+    eye.unlock = { market: eye.mode === "asis" && /^MM_(EXCLUDED|HIDDEN)$/.test(d.MarketMode || ""), store: eye.hasStore ? [hidden && "ShowInMarket=1", hidden && !own.data.RegularPrice && "RegularPrice=1", own.data.ExcludeFromManifest && "ExcludeFromManifest=0"].filter(Boolean) : [] };
     eye.manifest = true;
     eye.store = { path: toStorePath(path), parent: g.parent, category: g.category, name: d.LocalizeTag || "", desc: d.LocalizeDescTag || "", icon: d.Icon || "" };
     if (draft?.eye) Object.assign(eye.store, draft.eye.store), (eye.manifest = draft.eye.manifest);
@@ -1621,7 +1625,7 @@ function initEye() {
   pathSearch(input, async () => {
     const [lists, customs, chars] = await Promise.all([loadAllLists(), loadCustoms(), loadCharacters()]);
     const seen = new Set();
-    return namePaths(lists.concat(customs, PLAYABLE.map((c) => ({ path: c.path, name: cleanName(c.tag, c.path) })), chars.all.map((c) => ({ path: c.path, name: c.label || c.name }))).filter((i) => !seen.has(i.path) && seen.add(i.path)), byName);
+    return namePaths(lists.concat(customs, PLAYABLE.map((c) => ({ path: c.path, name: c.name || cleanName(c.tag, c.path) })), chars.all.map((c) => ({ path: c.path, name: c.label || c.name }))).filter((i) => !seen.has(i.path) && seen.add(i.path)), byName);
   });
   const mode = () => document.querySelector('input[name="eye-mode"]:checked').value;
   const resolve = () => byName.get(input.value.trim().toLowerCase()) || normalizePath(input.value);
