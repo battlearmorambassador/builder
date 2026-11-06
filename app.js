@@ -1545,7 +1545,7 @@ async function avatarSuitPath(t, path) {
   if (typeof inv !== "string") return null;
   const it = await loadType(relTo(t.origin.InventoryControllerType || path, inv));
   const list = (it?.data.DefaultInv || []).map((x) => relTo(it.origin.DefaultInv, x));
-  return list.find((x) => x.startsWith("/Lotus/Powersuits/")) || null;
+  return list.find((x) => /^\/Lotus\/Powersuits\/|\/[^/]*Suit$/.test(x)) || null;
 }
 const POWER_SUIT_STORE = "/Lotus/Types/Game/StoreItemSpecializations/PowerSuitStoreItem";
 async function avatarLook(t, path, own, target) {
@@ -1621,7 +1621,7 @@ function initEye() {
   pathSearch(input, async () => {
     const [lists, customs, chars] = await Promise.all([loadAllLists(), loadCustoms(), loadCharacters()]);
     const seen = new Set();
-    return namePaths(lists.concat(customs, chars.all.map((c) => ({ path: c.path, name: c.label || c.name }))).filter((i) => !seen.has(i.path) && seen.add(i.path)), byName);
+    return namePaths(lists.concat(customs, PLAYABLE.map((c) => ({ path: c.path, name: cleanName(c.tag, c.path) })), chars.all.map((c) => ({ path: c.path, name: c.label || c.name }))).filter((i) => !seen.has(i.path) && seen.add(i.path)), byName);
   });
   const mode = () => document.querySelector('input[name="eye-mode"]:checked').value;
   const resolve = () => byName.get(input.value.trim().toLowerCase()) || normalizePath(input.value);
