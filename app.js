@@ -157,7 +157,16 @@ function getJSON(url) {
 let DICT = null;
 const loadDict = () => getJSON(PEP + "/dict.en.json").then((d) => (DICT = d));
 const FIELDS = window.FIELDS_DATA || {};
-const VERSIONS = window.VERSIONS_DATA || [];
+const VERSION_SOURCE = "https://raw.githubusercontent.com/spaceninjaserver/about.openwf.io/main/versions.php";
+async function loadBuilds() {
+  const php = await (await fetch(VERSION_SOURCE)).text(), builds = new Map();
+  for (const m of php.matchAll(/"(\d{4}(?:\.\d{2}){4})(?:\/[^"]*)?"(?:\s*\/\*[^*]*\*\/)?\s*=>\s*"([^"]+)"/g)) builds.set(m[1], m[2]);
+  for (const row of php.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
+    const cells = [...row[1].matchAll(/<td>([\s\S]*?)<\/td>/g)].map((x) => x[1].replace(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<[^>]+>/g, "").trim());
+    if (/^\d{4}(\.\d{2}){4}$/.test(cells[0] || "") && !builds.has(cells[0])) builds.set(cells[0], (cells[1] || "").replace(/^\D+/, ""));
+  }
+  return [...builds].sort((a, b) => b[0].localeCompare(a[0]));
+}
 const loc = (k) => (DICT && k && DICT[k]) || null;
 const tail = (p) => p.split("/").pop();
 const toStorePath = (p) => p.replace(/^\/Lotus\//, "/Lotus/StoreItems/");
@@ -1472,7 +1481,7 @@ function initEditor() {
     }
   });
   $("#patch-name").addEventListener("input", (e) => { ed.name = e.target.value; renderOutput(); });
-  $("#cond-ver-list").append(...VERSIONS.map((x) => h("option", { value: x.v }, x.l)));
+  loadBuilds().then((list) => $("#cond-ver-list").append(...list.map(([v, l]) => h("option", { value: v }, l)))).catch(() => {});
   $("#cond-mode").addEventListener("change", () => { syncCond(); renderOutput(); });
   $("#cond-on").addEventListener("change", () => { syncCond(); renderOutput(); });
   $("#cond-ver").addEventListener("input", () => { syncCond(); renderOutput(); });
