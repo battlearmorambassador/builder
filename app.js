@@ -1524,18 +1524,20 @@ function pathSearch(input, load) {
   const box = h("div", { class: "sugg path-sugg", hidden: true });
   input.after(box);
   const list = suggestBox(input, box);
-  let data = null;
-  const choose = (i) => { input.value = i.name; list.close(); input.dispatchEvent(new Event("change")); };
+  let data = null, search = 0;
+  const choose = (i) => { search++; input.value = i.name; list.close(); input.dispatchEvent(new Event("change")); };
   input.addEventListener("focus", async () => { data ||= await load(); });
   input.addEventListener("input", debounce(async () => {
-    const q = input.value.trim().toLowerCase();
+    const id = ++search, q = input.value.trim().toLowerCase();
     data ||= await load();
+    if (id !== search) return;
     const hits = q.length < 2 ? [] : data.map((i) => {
       const n = i.name.toLowerCase(), at = n.indexOf(q);
       const rank = n === q ? 0 : at === 0 ? 1 : at > 0 ? 2 : (i.path + " " + (i.shown || "")).toLowerCase().includes(q) ? 3 : -1;
       return [rank, i];
     }).filter(([r]) => r >= 0).sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length).slice(0, 12);
-    list.show(hits.map(([, i]) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); choose(i); } }, h("span", { class: "pn" }, i.shown || i.name, i.flag ? flagIcon(i.flag) : null), h("span", { class: "pp" }, i.path.replace(/^\/Lotus\//, "")))));
+    const done = hits.length === 1 && [hits[0][1].name.toLowerCase(), hits[0][1].path.toLowerCase()].includes(q);
+    list.show((done ? [] : hits).map(([, i]) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); choose(i); } }, h("span", { class: "pn" }, i.shown || i.name, i.flag ? flagIcon(i.flag) : null), h("span", { class: "pp" }, i.path.replace(/^\/Lotus\//, "")))));
   }, 120));
 }
 async function avatarSuitPath(t, path) {
@@ -1634,9 +1636,11 @@ function initEye() {
   const checkItem = async () => {
     const id = ++checkId, p = resolve();
     status.textContent = "";
+    if (p) status.innerHTML = '<span class="spinner"></span>' + fmt(T.lookingUp, esc(p));
     let kind = null, failed = false;
     if (p) { try { kind = await itemKind(p); } catch { failed = true; } }
     if (id !== checkId) return;
+    status.textContent = "";
     $("#eye-choices").hidden = !kind;
     if (!kind) { if (p && input.value.trim()) status.textContent = failed ? OFFLINE : T.noDataFound; return; }
     showMode("asis", !kind.character);
@@ -1656,7 +1660,7 @@ function initEye() {
     suggest();
   };
   input.addEventListener("change", checkItem);
-  input.addEventListener("input", debounce(() => { if (input.value.trim().startsWith("/") || !input.value.trim()) checkItem(); }, 300));
+  input.addEventListener("input", debounce(() => { const v = input.value.trim(); if (!v || /^\/|^lotus\//i.test(v) || byName.has(v.toLowerCase())) checkItem(); else { checkId++; status.textContent = ""; $("#eye-choices").hidden = true; } }, 300));
   np.addEventListener("input", () => (np.dataset.auto = ""));
   $("#eye-form").onsubmit = async (e) => {
     e.preventDefault();
