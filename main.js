@@ -1,5 +1,8 @@
 "use strict";
 
+for (const el of document.querySelectorAll("[data-text]")) el.textContent = T[el.dataset.text];
+for (const el of document.querySelectorAll("[data-text-html]")) el.innerHTML = T[el.dataset.textHtml];
+for (const el of document.querySelectorAll("[data-text-placeholder]")) el.placeholder = T[el.dataset.textPlaceholder];
 initHome();
 initEditor();
 initBlank();

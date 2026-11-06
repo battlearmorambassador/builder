@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Metadata Patch Builder</title>
+<title data-text="appName">Metadata Patch Builder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -12,64 +12,70 @@
 <body>
 <section id="view-home" class="view home">
   <div class="home-inner">
-    <h1 class="title">Metadata Patch Builder</h1>
+    <h1 class="title" data-text="appName">Metadata Patch Builder</h1>
     <p class="subtitle">
-      OpenWF: <a href="https://about.openwf.io" target="_blank" rel="noopener">Original Guide</a>
-      <span class="sep">·</span> <a href="https://battlearmorambassador.github.io/guide/" target="_blank" rel="noopener">Restyled Guide</a><br>
-      Dependencies from <a href="https://github.com/calamity-inc" target="_blank" rel="noopener">Calamity Inc</a>
-      <span class="sep">·</span> All data is processed locally
+      <span data-text="homeOpenwf">OpenWF:</span> <a href="https://about.openwf.io" target="_blank" rel="noopener" data-text="originalGuide">Original Guide</a>
+      <span class="sep">·</span> <a href="https://battlearmorambassador.github.io/guide/" target="_blank" rel="noopener" data-text="restyledGuide">Restyled Guide</a><br>
+      <span data-text="homeDependencies">Dependencies from</span> <a href="https://github.com/calamity-inc" target="_blank" rel="noopener" data-text="calamityInc">Calamity Inc</a>
+      <span class="sep">·</span> <span data-text="homeLocal">All data is processed locally</span>
     </p>
     <div class="actions">
-      <button class="btn btn-primary start" id="btn-start">Get started</button>
-      <button class="btn start" id="btn-check">Check my patch</button>
+      <button class="btn btn-primary start" id="btn-start" data-text="getStarted">Get started</button>
+      <button class="btn start" id="btn-check" data-text="checkPatch">Check my patch</button>
     </div>
   </div>
   </section>
 <section id="view-choose" class="view" hidden>
   <header class="bar">
-    <a href="#/" class="brand">Metadata Patch Builder</a>
+    <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick">New patch</a><a class="navlink" href="#/eye">Sentient Builder</a><a class="navlink" href="#/check">Check my patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Check my patch</a></nav>
   </header>
   <div class="choose-inner">
-    <h2 class="choose-title">What do you want to patch?</h2>
+    <h2 class="choose-title" data-text="newPatchQuestion">What do you want to patch?</h2>
     <div class="choices" id="choose"></div>
     <div class="blank">
-      <button class="btn btn-primary start" id="btn-blank">Blank patch</button>
+      <button class="btn btn-primary start" id="btn-blank" data-text="blankPatch">Blank patch</button>
       <form class="blank-form" id="blank-form" hidden>
         <div class="path-w"><input class="input" id="blank-path" placeholder="/Lotus/Weapons/Tenno/Melee/Swords/KatanaAndWakizashi/Katana" spellcheck="false" autocomplete="off"></div>
-        <button class="btn btn-primary" type="submit">Open</button>
-        <div class="muted small">Type or paste any path or item name. You can also use <a href="https://browse.wf/" target="_blank" rel="noopener">https://browse.wf/</a></div>
+        <button class="btn btn-primary" type="submit" data-text="open">Open</button>
+        <div class="muted small" data-text-html="blankHintFull"></div>
       </form>
     </div>
   </div>
 </section>
 <section id="view-eye" class="view" hidden>
   <header class="bar">
-    <a href="#/" class="brand">Metadata Patch Builder</a>
+    <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick">New patch</a><a class="navlink" href="#/eye">Sentient Builder</a><a class="navlink" href="#/check">Check my patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Check my patch</a></nav>
   </header>
   <form class="eye-inner" id="eye-form">
-    <label class="label" for="eye-path">Item</label>
-    <div class="path-w"><input class="input" id="eye-path" placeholder="Search by name or paste a path, e.g. /Lotus/Powersuits/Stalker/Stalker" spellcheck="false" autocomplete="off"></div>
+    <label class="label" for="eye-path" data-text="item">Item</label>
+    <div class="path-w"><input class="input" id="eye-path" data-text-placeholder="searchOrPaste" placeholder="Search by name or paste a path, e.g. /Lotus/Powersuits/Stalker/Stalker" spellcheck="false" autocomplete="off"></div>
+    <div class="eye-choices" id="eye-choices" hidden>
+    <span class="label eye-question" data-text="sentientQuestion">What would you like to do?</span>
     <div class="eye-modes">
-      <label class="check"><input type="radio" name="eye-mode" value="asis" checked> <span>Make it obtainable as it is</span></label>
-      <label class="check"><input type="radio" name="eye-mode" value="new"> <span>Create a new item based on it</span></label>
-      <label class="check"><input type="radio" name="eye-mode" value="skin"> <span>Create a skin from an item (suit or weapon)</span></label>
+      <label class="eye-mode"><input type="radio" name="eye-mode" value="asis" checked><span><strong data-text="sentientItem">Get this item</strong><span class="muted small" data-text="sentientItemDesc">Adds the item itself to the market, so you can own it. Pick this if you want it as it is.</span></span></label>
+      <label class="eye-mode"><input type="radio" name="eye-mode" value="new"><span><strong data-text="sentientCopy">Get a changed copy</strong><span class="muted small" data-text="sentientCopyDesc">Adds a new item based on this one, so you can change it without touching the original.</span></span></label>
+      <label class="eye-mode" id="eye-suit-mode" hidden><input type="radio" name="eye-mode" value="suit"><span><strong data-text="sentientWarframe">Get as a Warframe</strong><span class="muted small" data-text="sentientWarframeDesc">Adds this character's own suit to the market, with its abilities, so you can play it like a Warframe.</span></span></label>
+      <label class="eye-mode"><input type="radio" name="eye-mode" value="skin"><span><strong data-text="sentientSkin">Get a skin</strong><span class="muted small" data-text="sentientSkinDesc">Adds a skin with the look of this character or weapon, to wear on your Warframes or weapons.</span></span></label>
     </div>
+    <p class="warn" id="eye-note" hidden></p>
     <div id="eye-new" hidden>
-      <label class="label" for="eye-newpath">New item path</label>
+      <label class="label" for="eye-newpath" data-text="newItemPath">New item path</label>
       <input class="input" id="eye-newpath" placeholder="/Lotus/Upgrades/Skins/Excalibur/MyNewSkin" spellcheck="false" autocomplete="off">
     </div>
-    <div class="eye-actions"><button class="btn btn-primary start" type="submit">Continue</button><span class="muted small" id="eye-status"></span></div>
+    <div class="eye-actions"><button class="btn btn-primary start" type="submit" data-text="continue">Continue</button></div>
+    </div>
+    <span class="muted small" id="eye-status"></span>
   </form>
 </section>
 <section id="view-skin" class="view" hidden>
   <header class="bar">
-    <a href="#/" class="brand">Metadata Patch Builder</a>
+    <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick">New patch</a><a class="navlink" href="#/eye">Sentient Builder</a><a class="navlink" href="#/check">Check my patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Check my patch</a></nav>
   </header>
   <div class="edit-head">
     <div class="target">
@@ -83,38 +89,38 @@
   </div>
   <div class="edit-body">
     <div class="pane">
-      <div class="pane-head"><span>Skin</span></div>
+      <div class="pane-head"><span data-text="skin">Skin</span></div>
       <div class="skin-form" id="skin-form"></div>
     </div>
     <div class="pane">
       <div class="pane-head">
-        <span>Output</span>
-        <button class="btn btn-ghost" id="skin-copy">Copy</button>
+        <span data-text="output">Output</span>
+        <button class="btn btn-ghost" id="skin-copy" data-text="copy">Copy</button>
       </div>
       <pre id="skin-output" class="output"></pre>
     </div>
   </div>
   <footer class="edit-foot">
-    <span class="muted small">Drop the file into <code>OpenWF/Metadata Patches/</code> and restart the game.</span>
-    <button class="btn btn-primary" id="skin-save">Save patch</button>
+    <span class="muted small" data-text-html="dropHintFull"></span>
+    <button class="btn btn-primary" id="skin-save" data-text="savePatch">Save patch</button>
   </footer>
 </section>
 <section id="view-check" class="view" hidden>
   <header class="bar">
-    <a href="#/" class="brand">Metadata Patch Builder</a>
+    <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick">New patch</a><a class="navlink" href="#/eye">Sentient Builder</a><a class="navlink" href="#/check">Check my patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Check my patch</a></nav>
   </header>
   <div class="check-head">
-    <h2 class="choose-title">Check my patch</h2>
-    <p class="muted">Paste or drag and drop your patch here. If valid, the output will reflect it.</p>
-    <p class="warn">Some paths might not be detected as valid for older versions. While the game is running, open <code>http://localhost:6155/get_effective_metadata?/Lotus/Path/Here</code> to check that the metadata shows up properly.</p>
+    <h2 class="choose-title" data-text="checkPatch">Check my patch</h2>
+    <p class="muted" data-text="checkIntro">Paste or drag and drop your patch here. If valid, the output will reflect it.</p>
+    <p class="warn" data-text-html="checkHint"></p>
   </div>
   <div class="edit-body check-body">
     <div class="pane">
       <div class="pane-head">
-        <span>Patch</span>
-        <label class="btn btn-ghost file-btn">Open file<input type="file" id="check-file" accept=".txt,text/plain" hidden></label>
+        <span data-text="patch">Patch</span>
+        <label class="btn btn-ghost file-btn"><span data-text="openFile">Open file</span><input type="file" id="check-file" accept=".txt,text/plain" hidden></label>
       </div>
       <div class="check-editor">
         <pre class="gutter" id="check-gutter" aria-hidden="true"></pre>
@@ -123,7 +129,7 @@
     </div>
     <div class="pane">
       <div class="pane-head">
-        <span>Results</span>
+        <span data-text="results">Results</span>
         <span id="check-summary" class="small"></span>
       </div>
       <div id="check-results" class="results"></div>
@@ -132,36 +138,36 @@
 </section>
 <section id="view-pick" class="view" hidden>
   <header class="bar">
-    <a href="#/" class="brand">Metadata Patch Builder</a>
+    <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <nav class="cats bar-center" id="cats">
-      <button data-cat="suit">Suit</button>
-      <button data-cat="weapon">Weapon</button>
-      <button data-cat="upgrade">Mods / Arcanes</button>
+      <button data-cat="suit" data-text="suit">Suit</button>
+      <button data-cat="weapon" data-text="weapon">Weapon</button>
+      <button data-cat="upgrade" data-text="modsArcanes">Mods / Arcanes</button>
     </nav>
-    <nav class="bar-right"><a class="navlink" href="#/pick">New patch</a><a class="navlink" href="#/eye">Sentient Builder</a><a class="navlink" href="#/check">Check my patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Check my patch</a></nav>
   </header>
   <div class="pick-tools">
-    <input id="search" class="input search" type="search" placeholder="Search by name or path…" autocomplete="off" spellcheck="false">
-    <div class="pick-row"><div class="subcats" id="subcats"></div><div class="pick-legend" id="pick-legend" hidden></div><button class="btn btn-ghost" id="btn-multi" type="button">Select multiple</button></div>
+    <input id="search" class="input search" type="search" data-text-placeholder="searchItems" placeholder="Search by name or path" autocomplete="off" spellcheck="false">
+    <div class="pick-row"><div class="subcats" id="subcats"></div><div class="pick-legend" id="pick-legend" hidden></div><button class="btn btn-ghost" id="btn-multi" type="button" data-text="selectMultiple">Select multiple</button></div>
   </div>
   <div id="pick-status" class="status"></div>
   <div id="grid" class="grid"></div>
   <div class="multi-bar" id="multi-bar" hidden>
     <span id="multi-count"></span>
-    <button class="btn btn-ghost" id="multi-clear" type="button">Clear</button>
-    <button class="btn btn-primary" id="multi-open" type="button" disabled>Open patch</button>
+    <button class="btn btn-ghost" id="multi-clear" type="button" data-text="clear">Clear</button>
+    <button class="btn btn-primary" id="multi-open" type="button" disabled data-text="openPatch">Open patch</button>
   </div>
 </section>
 
 <section id="view-edit" class="view" hidden>
   <header class="bar">
-    <a href="#/" class="brand">Metadata Patch Builder</a>
+    <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick">New patch</a><a class="navlink" href="#/eye">Sentient Builder</a><a class="navlink" href="#/check">Check my patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Check my patch</a></nav>
   </header>
   <div class="edit-head">
-    <label class="label" for="patch-name">Patch name</label>
-    <input id="patch-name" class="input" type="text" placeholder="My patch" spellcheck="false">
+    <label class="label" for="patch-name" data-text="patchName">Patch name</label>
+    <input id="patch-name" class="input" type="text" data-text-placeholder="myPatch" placeholder="My patch" spellcheck="false">
     <div class="target">
       <img id="target-icon" alt="">
       <div>
@@ -169,17 +175,16 @@
         <code id="target-path"></code>
         <div class="opts">
         <div class="cond">
-          <label class="check"><input type="checkbox" id="cond-on"> <span>Build version specific?</span></label>
+          <label class="check"><input type="checkbox" id="cond-on"> <span data-text="buildVersionSpecific">Build version specific?</span></label>
           <span id="cond-opts" hidden>
             <select class="input mini" id="cond-mode">
-              <option value="from">This build and newer</option>
-              <option value="before">Older than this build</option>
-              <option value="newtypes">Builds that support new types (U42 and newer)</option>
+              <option value="from" data-text="buildFrom">This build and newer</option>
+              <option value="before" data-text="buildBefore">Older than this build</option>
+              <option value="newtypes" data-text="buildNewTypes">Builds that support new types (U42 and newer)</option>
             </select>
-            <input class="input mini" id="cond-ver" list="cond-ver-list" placeholder="Build, e.g. 2026.05.13.13.07" spellcheck="false">
-            <datalist id="cond-ver-list"></datalist>
+            <div class="path-w"><input class="input mini" id="cond-ver" data-text-placeholder="buildExample" placeholder="Build, e.g. 2026.05.13.13.07" spellcheck="false"></div>
           </span>
-          <span class="warn" id="cond-warn" hidden>Enter a build, or the patch applies to every build.</span>
+          <span class="warn" id="cond-warn" hidden data-text="buildMissing">Enter a build, or the patch applies to every build.</span>
         </div>
         </div>
         <div class="warn" id="parent-warn" hidden></div>
@@ -191,37 +196,37 @@
   <div class="edit-body">
     <div class="pane">
       <div class="pane-head">
-        <span>Metadata</span>
-        <div class="tools">
-          <label class="check small"><input type="checkbox" id="adv-toggle"> <span>Advanced editor</span></label>
-          <label class="check small tree-tool"><input type="checkbox" id="changed-only"> <span>Changed only</span></label>
-          <button class="btn btn-ghost tree-tool" id="btn-expand" type="button">Expand all</button>
-          <button class="btn btn-ghost tree-tool" id="btn-collapse" type="button">Collapse all</button>
-          <input id="key-filter" class="input mini" type="search" placeholder="Filter fields…" autocomplete="off" spellcheck="false">
-          <button class="btn btn-ghost" id="btn-fr">Find &amp; replace</button>
-          <button class="btn btn-ghost" id="btn-reset" type="button">Reset all</button>
-        </div>
+        <span data-text="metadata">Metadata</span>
+        <label class="check small head-check"><input type="checkbox" id="adv-toggle"> <span data-text="advancedEditor">Advanced editor</span></label>
+      </div>
+      <div class="tree-bar">
+        <input id="key-filter" class="input mini" type="search" data-text-placeholder="filterFields" placeholder="Filter fields…" autocomplete="off" spellcheck="false">
+        <label class="check small"><input type="checkbox" id="changed-only"> <span data-text="changedOnly">Changed only</span></label>
+        <button class="btn btn-ghost" id="btn-expand" type="button" data-text="expandAll">Expand all</button>
+        <button class="btn btn-ghost" id="btn-collapse" type="button" data-text="collapseAll">Collapse all</button>
+        <button class="btn btn-ghost" id="btn-fr" type="button" data-text="findReplace">Find &amp; replace</button>
+        <button class="btn btn-ghost" id="btn-reset" type="button" data-text="resetAll">Reset all</button>
       </div>
       <div class="fr" id="fr" hidden>
         <div class="fr-row">
-          <input class="input mini" id="fr-from" placeholder="Find text" spellcheck="false">
-          <input class="input mini" id="fr-to" placeholder="Replace with" spellcheck="false">
-          <label class="check small"><input type="checkbox" id="fr-regex"> Regex</label>
-          <button class="btn" id="fr-add">Apply</button>
+          <input class="input mini" id="fr-from" data-text-placeholder="findText" placeholder="Find text" spellcheck="false">
+          <input class="input mini" id="fr-to" data-text-placeholder="replaceWith" placeholder="Replace with" spellcheck="false">
+          <label class="check small"><input type="checkbox" id="fr-regex"> <span data-text="regex">Regex</span></label>
+          <button class="btn" id="fr-add" data-text="apply">Apply</button>
         </div>
         <div id="fr-list" class="fr-list"></div>
       </div>
       <div id="sides"></div>
       <div class="add-menu" id="add-menu" hidden>
-        <input class="input" id="add-search" type="search" placeholder="Filter fields…" autocomplete="off" spellcheck="false">
+        <input class="input" id="add-search" type="search" data-text-placeholder="filterFields" placeholder="Filter fields…" autocomplete="off" spellcheck="false">
         <div class="add-list" id="add-list"></div>
       </div>
     </div>
     <div class="pane">
       <div class="pane-head">
-        <div class="out-tabs" id="out-tabs" hidden><button type="button" data-tab="preview">Preview</button><button type="button" data-tab="output">Output</button></div>
-        <span id="out-title">Output</span>
-        <button class="btn btn-ghost" id="btn-copy">Copy</button>
+        <div class="out-tabs" id="out-tabs" hidden><button type="button" data-tab="preview" data-text="preview">Preview</button><button type="button" data-tab="output" data-text="output">Output</button></div>
+        <span id="out-title" data-text="output">Output</span>
+        <button class="btn btn-ghost" id="btn-copy" data-text="copy">Copy</button>
       </div>
       <div id="action-info" hidden></div>
       <div id="card-preview" hidden></div>
@@ -229,12 +234,13 @@
     </div>
   </div>
   <footer class="edit-foot">
-    <span class="muted small">Drop the file into <code>OpenWF/Metadata Patches/</code> and restart the game.</span>
-    <button class="btn btn-primary" id="btn-save">Save patch</button>
+    <span class="muted small" data-text-html="dropHintFull"></span>
+    <button class="btn btn-primary" id="btn-save" data-text="savePatch">Save patch</button>
   </footer>
 </section>
 
 <div id="toast" class="toast" hidden></div>
+<script src="data/strings.js"></script>
 <script src="data/fields.js"></script>
 <script src="data/enums.js"></script>
 <script src="data/statcatalog.js"></script>

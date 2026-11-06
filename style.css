@@ -108,7 +108,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; margin-top: 8px; }
 .cond, #cond-opts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cond select { width: auto; }
-#cond-ver { width: 230px; }
+.cond .path-w { width: 300px; max-width: 100%; }
 .warn { margin-top: 8px; color: var(--warn); font-size: 14px; }
 .warn a { color: inherit; border-color: currentColor; }
 .target img.credit-icon { display: inline; width: 15px; height: 15px; vertical-align: -3px; }
@@ -117,12 +117,14 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .pane:last-child { position: sticky; top: 70px; }
 #view-edit .pane:last-child { max-height: calc(100vh - 150px); overflow: auto; }
 .pane-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--dim); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
-.pane-head .tools, .file-btn { text-transform: none; letter-spacing: 0; }
-.tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; align-items: center; }
+.head-check, .file-btn { text-transform: none; letter-spacing: 0; }
+.tree-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.tree-bar .input { flex: 1 1 100%; width: auto; }
+.tree-bar .btn { padding: 5px 10px; font-size: 13px; }
+.tree-bar .check { margin-right: 4px; }
 .more-fields { background: none; border: 0; padding: 4px 6px 6px 32px; color: var(--faint); font: 12px var(--sans); cursor: pointer; }
 .more-fields:hover { color: var(--fg); }
-.tools .input { width: 160px; }
-#view-edit.basic #key-filter, #view-edit.basic .tree-tool, #view-edit.basic #btn-fr, #view-edit.basic #btn-reset, #view-edit.basic #fr, #view-edit.basic .add-wrap { display: none; }
+#view-edit.basic .tree-bar, #view-edit.basic #fr, #view-edit.basic .add-wrap { display: none; }
 .basic-note { margin: 0; padding: 0 14px 12px; border-bottom: 1px solid var(--line); }
 .output { margin: 0; padding: 14px; min-height: 220px; max-height: calc(100vh - 220px); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .output .c { color: var(--faint); }
@@ -229,7 +231,16 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .multi-bar { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--line); background: rgba(0,0,0,.9); backdrop-filter: blur(8px); }
 #multi-count { color: var(--dim); font-size: 14px; }
 .eye-inner { max-width: 720px; margin: 0 auto; padding: 10vh 24px 40px; display: flex; flex-direction: column; gap: 10px; }
-.eye-modes { display: flex; gap: 24px; flex-wrap: wrap; margin: 6px 0; }
+.eye-choices { display: flex; flex-direction: column; gap: 10px; }
+.eye-question { margin: 10px 0 0; }
+.eye-modes { display: flex; flex-direction: column; gap: 8px; }
+.eye-mode { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; transition: border-color .15s; }
+.eye-mode:hover, .eye-mode:has(input:checked) { border-color: var(--line-2); }
+.eye-mode:has(input:checked) strong { color: #fff; }
+.eye-mode:has(input:disabled) { opacity: .45; cursor: default; }
+.eye-mode input { margin-top: 4px; accent-color: #fff; }
+.eye-mode > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.eye-mode strong { font-weight: 500; }
 .eye-actions { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
 .eye-panel { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); display: flex; flex-direction: column; gap: 12px; }
 .eye-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 16px; }
@@ -252,7 +263,6 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
   .node .line { grid-template-columns: 18px minmax(0, 1fr) auto; }
   .node .line > .input, .node .line > .w { grid-column: 2 / -1; }
   .loc { padding-left: 32px; }
-  .tools .input { width: 110px; }
 }
 @media (max-width: 700px) {
   .pick-row { grid-template-columns: 1fr auto; }
@@ -306,6 +316,9 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .mod-body { position: absolute; left: 20px; top: 222px; width: 216px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; text-align: center; color: var(--mod-text); }
 .mod-name { font-size: 22px; line-height: 27px; overflow-wrap: anywhere; }
 .mod-desc, .mod-stat { font-size: 15px; line-height: 18px; }
+.text-icon { display: inline-block; width: 1em; height: 1em; margin-right: .2em; vertical-align: -.14em; }
+.icon-select { position: relative; max-width: 420px; }
+.icon-select .text-icon { position: absolute; right: 30px; top: 50%; width: 18px; height: 18px; margin: 0; transform: translateY(-50%); pointer-events: none; }
 .mod-tagbg { position: absolute; left: 0; top: calc(297px + var(--mod-extra, 0px)); width: 256px; height: 32px; }
 .mod-tag { position: absolute; left: 35px; top: calc(303px + var(--mod-extra, 0px)); width: 186px; text-align: center; font: 500 12px/20px var(--sans); color: var(--mod-text); }
 .mod-piece { position: absolute; max-width: none; pointer-events: none; }

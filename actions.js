@@ -39,7 +39,7 @@ function undoAction(id) {
   note(id);
   for (const a of ed.actions.slice(at + 1)) if (opsOf(a.id).some((o) => keys.has(o.path[0]))) { ids.add(a.id); note(a.id); }
   const first = ed.ops.findIndex((o) => o.aid === id);
-  if (ed.ops.slice(first).some((o) => !o.aid && keys.has(o.path[0]))) { toast("Later edits in the Advanced editor depend on this change"); return; }
+  if (ed.ops.slice(first).some((o) => !o.aid && keys.has(o.path[0]))) { toast(T.undoBlocked); return; }
   const undone = ed.actions.filter((a) => ids.has(a.id)).map((action) => ({ action, ops: opsOf(action.id) }));
   ed.redo = [...(ed.redo || []), ...undone.reverse()];
   ed.ops = ed.ops.filter((o) => !ids.has(o.aid));
@@ -47,7 +47,7 @@ function undoAction(id) {
   actionForm = null;
   replayAll();
   refresh();
-  if (ids.size > 1) toast("Also undid " + (ids.size - 1) + " later change" + (ids.size > 2 ? "s" : "") + " that depended on it");
+  if (ids.size > 1) toast(ids.size === 2 ? T.undidOne : fmt(T.undidMany, ids.size - 1));
 }
 function redoAction() {
   const r = ed.redo?.pop();
@@ -68,28 +68,29 @@ function undoAllActions() {
   refresh();
 }
 const FACTIONS = [
-  ["Grineer", "Grineer", "/Lotus/Language/Upgrades/WeaponFactionDamageGrineerDesc"], ["Corpus", "Corpus", "/Lotus/Language/Upgrades/WeaponFactionDamageCorpusDesc"],
-  ["Infestation", "Infested", "/Lotus/Language/Upgrades/WeaponFactionDamageInfestedDesc"], ["Orokin", "Corrupted", "/Lotus/Language/Upgrades/WeaponFactionDamageCorruptedDesc"],
-  ["MITW", "Murmur", "/Lotus/Language/Mods/WeaponFactionDamageMurmursDesc"], ["Sentient", "Sentient", "/Lotus/Language/Upgrades/WeaponFactionDamageSentientsDesc"],
-  ["Techrot", "Techrot", "/Lotus/Language/Upgrades/WeaponFactionDamageTechrotDesc"], ["Scaldra", "Scaldra", "/Lotus/Language/Upgrades/WeaponFactionDamageScaldraDesc"],
+  ["Grineer", "/Lotus/Language/Game/Faction_GrineerUC", "/Lotus/Language/Upgrades/WeaponFactionDamageGrineerDesc"], ["Corpus", "/Lotus/Language/Game/Faction_CorpusUC", "/Lotus/Language/Upgrades/WeaponFactionDamageCorpusDesc"],
+  ["Infestation", "/Lotus/Language/Game/Faction_InfestationUC", "/Lotus/Language/Upgrades/WeaponFactionDamageInfestedDesc"], ["Orokin", "/Lotus/Language/Game/Faction_OrokinUC", "/Lotus/Language/Upgrades/WeaponFactionDamageCorruptedDesc"],
+  ["MITW", "/Lotus/Language/Game/Faction_MITW", "/Lotus/Language/Mods/WeaponFactionDamageMurmursDesc"], ["Sentient", "/Lotus/Language/Game/Faction_SentientUC", "/Lotus/Language/Upgrades/WeaponFactionDamageSentientsDesc"],
+  ["Techrot", "/Lotus/Language/1999/Faction_Techrot", "/Lotus/Language/Upgrades/WeaponFactionDamageTechrotDesc"], ["Scaldra", "/Lotus/Language/1999/Faction_Scaldra", "/Lotus/Language/Upgrades/WeaponFactionDamageScaldraDesc"],
 ];
-const PROC_NAMES = { PT_BLEEDING: "Slash", PT_FRAILTY: "Puncture", PT_KNOCKBACK: "Impact", PT_POISONED: "Toxin", PT_CAUSTIC_BURN: "Corrosive", PT_IMMOLATION: "Heat", PT_CHILLED: "Cold", PT_MAGNETIZED: "Magnetic", PT_ASPHYXIATION: "Gas", PT_RAD_TOX: "Radiation", PT_STAGGERED: "Stagger", PT_BIG_STAGGER: "Heavy Stagger", PT_STUNNED: "Stun", PT_KNOCKED_DOWN: "Knockdown", PT_RAGDOLL: "Ragdoll" };
+const gameLabel = (key) => { const t = stripTags(loc(key) || tail(key).replace(/^Faction_|UC$/g, "")); return t === t.toUpperCase() ? t[0] + t.slice(1).toLowerCase() : t; };
+const PROC_NAMES = { PT_BLEEDING: T.slash, PT_FRAILTY: T.puncture, PT_KNOCKBACK: T.impact, PT_POISONED: T.toxin, PT_CAUSTIC_BURN: T.corrosive, PT_IMMOLATION: T.heat, PT_CHILLED: T.cold, PT_MAGNETIZED: T.magnetic, PT_ASPHYXIATION: T.gas, PT_RAD_TOX: T.radiation, PT_STAGGERED: T.stagger, PT_BIG_STAGGER: T.heavyStagger, PT_STUNNED: T.stun, PT_KNOCKED_DOWN: T.knockdown, PT_RAGDOLL: T.ragdoll };
 const procs = (...vals) => vals.map((v) => [v, PROC_NAMES[v]]);
 const damages = (...vals) => vals.map((v) => [v, enumLabel(v)]);
 const STAT_CHOICES = {
-  GAMEPLAY_FACTION_DAMAGE: { label: "Faction", key: "SymbolFilter", options: FACTIONS },
-  AVATAR_INJURY_BLOCK_CHANCE: { label: "Status Type", key: "SymbolFilter", options: procs("PT_BLEEDING", "PT_FRAILTY", "PT_KNOCKBACK", "PT_IMMOLATION", "PT_CHILLED", "PT_POISONED", "PT_CAUSTIC_BURN", "PT_ASPHYXIATION", "PT_MAGNETIZED", "PT_RAD_TOX", "PT_STAGGERED", "PT_BIG_STAGGER", "PT_STUNNED", "PT_KNOCKED_DOWN", "PT_RAGDOLL") },
-  AVATAR_INJURY_ANIM_RATE: { label: "Status Type", key: "SymbolFilter", options: procs("PT_STAGGERED", "PT_BIG_STAGGER") },
-  AVATAR_PROC_IMMUNITY_DURATION: { label: "Status Type", key: "SymbolFilter", options: procs("PT_BIG_STAGGER", "PT_RAGDOLL") },
-  WEAPON_DAMAGE_PER_ACTIVE_PROC_STACK_ON_VICTIM: { label: "Status Type", key: "ValidProcTypes", list: true, options: procs("PT_CHILLED") },
-  WEAPON_FORCED_PROC_CHANCE: { label: "Status Type", key: "ValidProcTypes", list: true, options: procs("PT_KNOCKED_DOWN") },
-  WEAPON_DAMAGE_CONVERSION: { label: "Convert To", key: "SymbolFilter", options: damages("DT_IMPACT", "DT_PUNCTURE", "DT_SLASH", "DT_FIRE", "DT_ELECTRICITY", "DT_VIRAL") },
-  WEAPON_DAMAGE_CONVERSION_POST_COALESCE: { label: "Convert To", key: "SymbolFilter", options: damages("DT_FIRE", "DT_FREEZE", "DT_ELECTRICITY", "DT_POISON") },
-  AVATAR_STAMINA_COST_MULTIPLIER: { label: "Applies To", key: "SymbolFilter", options: [["", "Everything"], ["SLIDE_STAMINA", "Sliding"], ["HOVER_STAMINA", "Hovering"]] },
-  WEAPON_PICKUP_SHOOT_BONUS: { label: "Pickup", key: "UpgradeObject", options: [["/Lotus/Types/PickUps/EnergyIncreaseSmall", "Energy"], ["/Lotus/Types/PickUps/HealthIncrease", "Health"]] },
+  GAMEPLAY_FACTION_DAMAGE: { label: T.faction, key: "SymbolFilter", get options() { return FACTIONS.map(([v, key, text]) => [v, gameLabel(key), text]); } },
+  AVATAR_INJURY_BLOCK_CHANCE: { label: T.statusType, key: "SymbolFilter", options: procs("PT_BLEEDING", "PT_FRAILTY", "PT_KNOCKBACK", "PT_IMMOLATION", "PT_CHILLED", "PT_POISONED", "PT_CAUSTIC_BURN", "PT_ASPHYXIATION", "PT_MAGNETIZED", "PT_RAD_TOX", "PT_STAGGERED", "PT_BIG_STAGGER", "PT_STUNNED", "PT_KNOCKED_DOWN", "PT_RAGDOLL") },
+  AVATAR_INJURY_ANIM_RATE: { label: T.statusType, key: "SymbolFilter", options: procs("PT_STAGGERED", "PT_BIG_STAGGER") },
+  AVATAR_PROC_IMMUNITY_DURATION: { label: T.statusType, key: "SymbolFilter", options: procs("PT_BIG_STAGGER", "PT_RAGDOLL") },
+  WEAPON_DAMAGE_PER_ACTIVE_PROC_STACK_ON_VICTIM: { label: T.statusType, key: "ValidProcTypes", list: true, options: procs("PT_CHILLED") },
+  WEAPON_FORCED_PROC_CHANCE: { label: T.statusType, key: "ValidProcTypes", list: true, options: procs("PT_KNOCKED_DOWN") },
+  WEAPON_DAMAGE_CONVERSION: { label: T.convertTo, key: "SymbolFilter", options: damages("DT_IMPACT", "DT_PUNCTURE", "DT_SLASH", "DT_FIRE", "DT_ELECTRICITY", "DT_VIRAL") },
+  WEAPON_DAMAGE_CONVERSION_POST_COALESCE: { label: T.convertTo, key: "SymbolFilter", options: damages("DT_FIRE", "DT_FREEZE", "DT_ELECTRICITY", "DT_POISON") },
+  AVATAR_STAMINA_COST_MULTIPLIER: { label: T.appliesTo, key: "SymbolFilter", options: [["", T.everything], ["SLIDE_STAMINA", T.sliding], ["HOVER_STAMINA", T.hovering]] },
+  WEAPON_PICKUP_SHOOT_BONUS: { label: T.pickup, key: "UpgradeObject", options: [["/Lotus/Types/PickUps/EnergyIncreaseSmall", T.energy], ["/Lotus/Types/PickUps/HealthIncrease", T.health]] },
 };
-const WHEN_NAMES = { PM_AIM: "When Aiming", PM_IN_AIR: "While Airborne", PM_AIRBORNE: "While Airborne", PM_BULLETJUMP: "During Bullet Jump", PM_DODGE: "While Dodging", PM_KNOCKDOWN: "When Knocked Down", PM_CLOAK: "While Invisible", PM_PARRY: "While Blocking", PM_HEAVY_MELEE: "On Heavy Attack", CC_SLIDING: "Slide Attacks", CC_GROUND_HEAVY: "Tennokai Attacks", CC_DOWNED_ENEMY: "Against Prone Enemies", PT_LIFT_HIT: "On Lifted Enemies" };
-const whenName = (t, v) => (t === "WEAPON_ZOOM" && v === "PM_IN_AIR" ? "While Aim Gliding" : WHEN_NAMES[v]);
+const WHEN_NAMES = { PM_AIM: T.whenAiming, PM_IN_AIR: T.whileAirborne, PM_AIRBORNE: T.whileAirborne, PM_BULLETJUMP: T.duringBulletJump, PM_DODGE: T.whileDodging, PM_KNOCKDOWN: T.whenKnockedDown, PM_CLOAK: T.whileInvisible, PM_PARRY: T.whileBlocking, PM_HEAVY_MELEE: T.onHeavyAttack, CC_SLIDING: T.slideAttacks, CC_GROUND_HEAVY: T.tennokaiAttacks, CC_DOWNED_ENEMY: T.againstProneEnemies, PT_LIFT_HIT: T.onLiftedEnemies };
+const whenName = (t, v) => (t === "WEAPON_ZOOM" && v === "PM_IN_AIR" ? T.whileAimGliding : WHEN_NAMES[v]);
 const whenOf = (u) => firstOf(u.ValidModifiers) || (/^CC_/.test(u.SymbolFilter || "") ? u.SymbolFilter : "") || (firstOf(u.ValidProcTypes) === "PT_LIFT_HIT" ? "PT_LIFT_HIT" : "");
 const FIXED_FILTERS = { WEAPON_AUTO_RELOAD_RATE: "Holstered", WEAPON_CRIT_CHANCE_BODY_PART: "HEAD" };
 const STAT_WHEN = {"AVATAR_INJURY_BLOCK_CHANCE": ["PM_AIM"], "WEAPON_CRIT_CHANCE": ["PM_HEAVY_MELEE", "PM_AIM", "CC_SLIDING"], "WEAPON_SPREAD": ["PM_AIM", "PM_AIRBORNE"], "WEAPON_RECOIL": ["PM_AIRBORNE"], "WEAPON_MELEE_DAMAGE": ["PM_HEAVY_MELEE", "CC_SLIDING", "CC_GROUND_HEAVY"], "WEAPON_SHIELD_PERCENT_ON_KILL": ["PM_HEAVY_MELEE"], "AVATAR_DAMAGE_TAKEN": ["PM_IN_AIR", "PM_KNOCKDOWN", "PM_DODGE", "PM_BULLETJUMP"], "WEAPON_MELEE_COMBO_GAIN_EXTRA_CHANCE": ["PM_PARRY"], "AVATAR_SLIDE_BOOST": ["PM_IN_AIR"], "WEAPON_PROC_CHANCE": ["PM_AIM", "CC_GROUND_HEAVY", "CC_DOWNED_ENEMY", "PT_LIFT_HIT"], "WEAPON_FIRE_RATE": ["PM_AIM", "PM_IN_AIR"], "WEAPON_CRIT_DAMAGE": ["PM_AIM"], "WEAPON_RANGE": ["PM_IN_AIR"], "WEAPON_ZOOM": ["PM_IN_AIR", "PM_AIM"], "WEAPON_DAMAGE_AMOUNT": ["PM_CLOAK", "PM_AIM"], "WEAPON_SNIPER_COMBO_DURATION_BONUS": ["PM_AIM"], "WEAPON_PROJECTILE_SPEED": ["PM_AIM"], "AVATAR_MOVEMENT_SPEED": ["PM_AIM"], "WEAPON_AMMO_CONSUME_RATE": ["PM_IN_AIR"], "WEAPON_LIFE_STEAL": ["PM_HEAVY_MELEE"], "WEAPON_MELEE_FINISHER_DAMAGE": ["CC_DOWNED_ENEMY"]};
@@ -97,7 +98,7 @@ const INTERNAL_STATS = new Set(["WEAPON_AUGMENT", "AVATAR_ABILITY_AUGMENT", "WEA
 const firstOf = (v) => (Array.isArray(v) ? v[0] : v);
 function statChoices(cur = {}) {
   const main = h("select", { class: "input" }), when = h("select", { class: "input" });
-  const mainWrap = field("Faction", main), whenWrap = field("When", when);
+  const mainWrap = field(T.faction, main), whenWrap = field(T.when, when);
   const sync = (t) => {
     const c = STAT_CHOICES[t], ws = STAT_WHEN[t];
     mainWrap.hidden = !c || c.options.length < 2;
@@ -106,7 +107,7 @@ function statChoices(cur = {}) {
       mainWrap.firstChild.textContent = c.label;
       main.replaceChildren(...c.options.map(([v, l]) => h("option", { value: v, selected: v === firstOf(cur[c.key]) }, l)));
     }
-    if (ws) when.replaceChildren(h("option", { value: "" }, "Always"), ...ws.map((v) => h("option", { value: v, selected: v === whenOf(cur) }, whenName(t, v))));
+    if (ws) when.replaceChildren(h("option", { value: "" }, T.always), ...ws.map((v) => h("option", { value: v, selected: v === whenOf(cur) }, whenName(t, v))));
   };
   const values = (t) => {
     const c = STAT_CHOICES[t], out = {};
@@ -126,18 +127,29 @@ function statChoices(cur = {}) {
   return { wraps: [mainWrap, whenWrap], main, when, sync, values };
 }
 const showsPercent = (x, op = x?.OperationType) => !!x?.DisplayAsPercent || (!!x?.DisplayAsMultiplier && op === "STACKING_MULTIPLY");
+const rankSuffix = () => new RegExp(" (" + T.atMaxRank + "|" + T.perRank + ")$");
+let textIcons = {};
+const loadTextIcons = () => getJSON(PEP + "/ExportTextIcons.json").then((d) => (textIcons = d)).catch(() => {});
+const textIcon = (key, cls) => { const p = textIcons[key]?.DIT_AUTO; return p ? h("img", { class: cls, src: IMG + p, alt: "" }) : null; };
+const textNodes = (text) => text.split(/<([A-Z0-9_]+)>/).map((x, i) => (i % 2 ? textIcon(x, "text-icon") : stripTags(x))).filter((x) => x);
+function iconSelect(select) {
+  const box = h("div", { class: "icon-select" }, select);
+  box.draw = () => { box.querySelector(".text-icon")?.remove(); const i = select.value && select.value !== "DT_ANY" ? textIcon(select.value + "_COLOR", "text-icon") : null; if (i) box.append(i); };
+  select.addEventListener("change", box.draw);
+  return box;
+}
 function statLine(u) {
   const pct = showsPercent(u), max = modMaxRank(), added = u.UpgradeType === "WEAPON_PERCENT_BASE_DAMAGE_ADDED";
   const choice = STAT_CHOICES[u.UpgradeType], picked = choice?.options.find((o) => o[0] === (firstOf(u[choice.key]) ?? ""))?.[1], whenText = whenName(u.UpgradeType, whenOf(u));
-  const base = added ? "Damage" : u.UpgradeType === "GAMEPLAY_FACTION_DAMAGE" && picked ? "Damage to " + picked : statName(String(u.UpgradeType)) + (picked ? " (" + picked + ")" : "");
+  const base = added ? T.damage : u.UpgradeType === "GAMEPLAY_FACTION_DAMAGE" && picked ? fmt(T.damageToFaction, picked) : statName(String(u.UpgradeType)) + (picked ? " (" + picked + ")" : "");
   const name = base + (whenText ? " (" + whenText + ")" : "");
   const dmg = u.DamageType && u.DamageType !== "DT_ANY" ? enumLabel(u.DamageType) + " " : "";
-  if (u.UpgradeType === "NONE" && !loc(u.LocTag)) return "Special Effect";
+  if (u.UpgradeType === "NONE" && !loc(u.LocTag)) return T.specialEffect;
   if (u.UpgradeType === "NONE") return stripTags(loc(u.LocTag));
   if (typeof u.Value !== "number") return dmg + name;
   const scaled = scalesWithRank(u.OperationType) && max != null ? u.Value * (max + 1) : u.Value;
   const shown = String(+(scaled * (pct ? 100 : 1)).toFixed(1)) + (pct ? "%" : "");
-  return (scaled >= 0 ? "+" : "") + shown + (dmg + name ? " " + (dmg + name).trim() : "") + (scalesWithRank(u.OperationType) ? (max ? " at max rank" : max == null ? " per rank" : "") : "");
+  return (scaled >= 0 ? "+" : "") + shown + (dmg + name ? " " + (dmg + name).trim() : "") + (scalesWithRank(u.OperationType) ? (max ? " " + T.atMaxRank : max == null ? " " + T.perRank : "") : "");
 }
 function amountToValue(amount, op, pct) {
   const max = modMaxRank();
@@ -149,14 +161,14 @@ function valueToAmount(u) {
 }
 function amountText(op, pct) {
   const rank = modMaxRank();
-  return (scalesWithRank(op) && rank ? "Amount at Max Rank" : scalesWithRank(op) && rank == null ? "Amount per Rank" : "Amount") + (pct ? " (%)" : "");
+  return (scalesWithRank(op) && rank ? T.amountMaxRank : scalesWithRank(op) && rank == null ? T.amountPerRank : T.amount) + (pct ? " (%)" : "");
 }
 const statTemplate = (row) => ({ ...(row?.tpl || {}), ValidType: "", CheckTypeOnInstall: 0, ValidModifiers: [], InvalidModifiers: [], ValidPostures: [], ValidProcTypes: [], UpgradeObject: "", SymbolFilter: FIXED_FILTERS[row?.t] || "" });
 const field = (label, input) => h("label", { class: "eye-field" }, h("span", { class: "label" }, titleCase(label)), input);
 const closeForm = () => { actionForm = null; renderSides(); };
 const formButtons = (text, onOk) => h("div", { class: "action-buttons" },
   h("button", { class: "btn btn-primary", type: "button", onclick: onOk }, text),
-  h("button", { class: "btn btn-ghost", type: "button", onclick: closeForm }, "Cancel"));
+  h("button", { class: "btn btn-ghost", type: "button", onclick: closeForm }, T.cancel));
 const actionBox = (...kids) => h("div", { class: "action-form", onkeydown: (e) => {
   if (e.key !== "Enter" || e.target.tagName !== "INPUT") return;
   e.preventDefault();
@@ -173,10 +185,10 @@ function addStatForm(sn) {
   const stats = [...new Set(CATALOG.map((r) => r.t))].filter((t) => !INTERNAL_STATS.has(t) && statName(t));
   const stat = statSelect(stats, usualRow("WEAPON_PERCENT_BASE_DAMAGE_ADDED") ? "WEAPON_PERCENT_BASE_DAMAGE_ADDED" : stats[0]);
   stat.classList.remove("mini");
-  const damage = h("select", { class: "input" }), how = h("select", { class: "input" });
+  const damage = h("select", { class: "input" }), how = h("select", { class: "input" }), damageBox = iconSelect(damage);
   const amount = h("input", { class: "input", inputMode: "decimal", placeholder: "e.g. 90", autocomplete: "off" });
-  const choices = statChoices(), howWrap = field("How it applies", how);
-  const damageWrap = field("Damage type", damage), amountLabel = h("span", { class: "label" }), preview = h("p", { class: "muted small" }), warn = h("p", { class: "warn", hidden: true });
+  const choices = statChoices(), howWrap = field(T.applyMode, how);
+  const damageWrap = field(T.damageType, damageBox), amountLabel = h("span", { class: "label" }), preview = h("p", { class: "muted small" }), warn = h("p", { class: "warn", hidden: true });
   const chosen = () => {
     const t = stat.value, d = damageWrap.hidden ? "DT_ANY" : damage.value, o = how.value;
     return { t, d, o, exact: CATALOG.find((r) => r.t === t && r.d === d && r.o === o), usual: usualRow(t, d) || usualRow(t) };
@@ -185,22 +197,23 @@ function addStatForm(sn) {
     const { o, exact, usual } = chosen(), pct = showsPercent((exact || usual)?.tpl, o);
     amountLabel.textContent = amountText(o, pct);
     const n = Number(amount.value);
-    preview.textContent = amount.value.trim() && !isNaN(n) ? "In game: " + statLine({ UpgradeType: stat.value, DamageType: chosen().d, OperationType: o, DisplayAsPercent: pct, ...choices.values(stat.value), Value: amountToValue(n, o, pct) }) : "";
+    preview.textContent = amount.value.trim() && !isNaN(n) ? fmt(T.inGameValue, statLine({ UpgradeType: stat.value, DamageType: chosen().d, OperationType: o, DisplayAsPercent: pct, ...choices.values(stat.value), Value: amountToValue(n, o, pct) })) : "";
     const notes = [];
-    if (!(exact?.loc || usual?.loc)) notes.push("No card text exists for this combination, so the mod card may not show this line.");
+    if (!(exact?.loc || usual?.loc)) notes.push(T.noCardText);
     warn.textContent = notes.join(" ");
     warn.hidden = !notes.length;
   };
   const fillHow = () => {
     const d = damageWrap.hidden ? "DT_ANY" : damage.value, rows = statRows(stat.value, d).sort((a, b) => b.n - a.n), seen = rows.map((r) => r.o);
     howWrap.hidden = new Set(seen).size < 2;
-    how.replaceChildren(...[...new Set(seen)].map((o, i) => h("option", { value: o }, enumLabel(o) + (i === 0 ? " (usual)" : ""))));
+    how.replaceChildren(...[...new Set(seen)].map((o, i) => h("option", { value: o }, i === 0 ? fmt(T.usualOption, enumLabel(o)) : enumLabel(o))));
     update();
   };
   const fillDamage = () => {
     const ds = [...new Set(statRows(stat.value).map((r) => r.d))].sort((a, b) => (b === "DT_ANY") - (a === "DT_ANY"));
     damageWrap.hidden = !ds.some((d) => d !== "DT_ANY");
     damage.replaceChildren(...ds.map((d) => h("option", { value: d }, enumLabel(d))));
+    damageBox.draw();
     choices.sync(stat.value);
     fillHow();
   };
@@ -211,50 +224,51 @@ function addStatForm(sn) {
   choices.when.addEventListener("change", update);
   amount.addEventListener("input", update);
   fillDamage();
-  return actionBox(h("div", { class: "sec-title" }, "Add a stat"),
-    field("Stat", stat), choices.wraps, damageWrap, howWrap, h("label", { class: "eye-field" }, amountLabel, amount), preview, warn,
-    formButtons("Add stat", () => {
+  return actionBox(h("div", { class: "sec-title" }, T.addStatTitle),
+    field(T.stat, stat), choices.wraps, damageWrap, howWrap, h("label", { class: "eye-field" }, amountLabel, amount), preview, warn,
+    formButtons(T.addStatButton, () => {
       const { t, d, o, exact, usual } = chosen(), n = Number(amount.value);
-      if (!amount.value.trim() || isNaN(n)) { toast("Enter an amount"); return; }
+      if (!amount.value.trim() || isNaN(n)) { toast(T.enterAnAmount); return; }
       const src = exact || usual, pct = showsPercent(src?.tpl, o), text = exact?.loc || usual?.loc || "";
       const entry = { UpgradeType: t, OperationType: o, Value: amountToValue(n, o, pct), DamageType: d, ...statTemplate(src), ...(text ? { OverrideLocalization: 1, LocTag: text } : {}), ...choices.values(t) };
       const list = ed.sides[sn].edit.Upgrades;
-      runAction("Add " + statLine(entry), () => record(sn, Array.isArray(list) ? { t: "push", path: ["Upgrades"], v: entry } : { t: "addKey", path: ["Upgrades"], v: [entry] }));
+      runAction(fmt(T.addAction, statLine(entry)), () => record(sn, Array.isArray(list) ? { t: "push", path: ["Upgrades"], v: entry } : { t: "addKey", path: ["Upgrades"], v: [entry] }));
     }));
 }
 function changeStatForm(sn, i) {
   const u = ed.sides[sn].edit.Upgrades[i], pct = showsPercent(u), was = String(u.UpgradeType), wasDamage = u.DamageType || "DT_ANY";
   const stat = statSelect([...new Set([was, ...CATALOG.map((r) => r.t).filter((t) => !INTERNAL_STATS.has(t) && statName(t))])], was);
   stat.classList.remove("mini");
-  const damage = h("select", { class: "input" }), damageWrap = field("Damage type", damage);
+  const damage = h("select", { class: "input" }), damageBox = iconSelect(damage), damageWrap = field(T.damageType, damageBox);
   const choices = statChoices(u);
   const amount = h("input", { class: "input", inputMode: "decimal", value: valueToAmount(u), autocomplete: "off" });
   const fillDamage = () => {
     const ds = [...new Set([...(stat.value === was ? [wasDamage] : []), ...statRows(stat.value).map((r) => r.d)])].filter(Boolean).sort((a, b) => (b === "DT_ANY") - (a === "DT_ANY"));
     damageWrap.hidden = !ds.some((d) => d !== "DT_ANY");
     damage.replaceChildren(...ds.map((d) => h("option", { value: d, selected: d === wasDamage }, enumLabel(d))));
+    damageBox.draw();
     choices.sync(stat.value);
   };
   stat.addEventListener("change", fillDamage);
   fillDamage();
-  return actionBox(h("div", { class: "sec-title" }, statName(was) ? "Change " + statName(was) : "Change stat"),
-    field("Stat", stat), choices.wraps, damageWrap, field(amountText(u.OperationType, pct), amount),
-    formButtons("Change stat", () => {
+  return actionBox(h("div", { class: "sec-title" }, statName(was) ? fmt(T.changeNamed, statName(was)) : T.changeStat),
+    field(T.stat, stat), choices.wraps, damageWrap, field(amountText(u.OperationType, pct), amount),
+    formButtons(T.changeStat, () => {
       const n = Number(amount.value), t = stat.value, d = damageWrap.hidden ? "DT_ANY" : damage.value;
-      if (!amount.value.trim() || isNaN(n)) { toast("Enter an amount"); return; }
+      if (!amount.value.trim() || isNaN(n)) { toast(T.enterAnAmount); return; }
       const picks = choices.values(t), samePicks = Object.entries(picks).every(([k, v]) => JSON.stringify(v) === JSON.stringify(u[k] ?? (Array.isArray(v) ? [] : "")));
       if (t === was && d === wasDamage && samePicks) {
         const v = amountToValue(n, u.OperationType, pct);
-        runAction("Change to " + statLine({ ...u, Value: v }), () => record(sn, { t: "set", path: ["Upgrades", String(i), "Value"], v }));
+        runAction(fmt(T.changeToValue, statLine({ ...u, Value: v })), () => record(sn, { t: "set", path: ["Upgrades", String(i), T.value], v }));
         return;
       }
       const row = CATALOG.find((r) => r.t === t && r.d === d && r.o === u.OperationType) || usualRow(t, d) || usualRow(t), rowPct = row ? showsPercent(row.tpl, u.OperationType) : pct;
       const next = { ...u, UpgradeType: t, DamageType: d, DisplayAsPercent: row?.tpl.DisplayAsPercent ?? u.DisplayAsPercent ?? 0, DisplayAsMultiplier: row?.tpl.DisplayAsMultiplier ?? u.DisplayAsMultiplier ?? 0, Value: amountToValue(n, u.OperationType, rowPct), OverrideLocalization: row?.loc ? 1 : 0, LocTag: row?.loc || "", SymbolFilter: FIXED_FILTERS[t] || "", UpgradeObject: "", ValidProcTypes: [], ValidModifiers: [], ...picks };
-      runAction("Change to " + statLine(next), () => Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(u[k] ?? (Array.isArray(next[k]) ? [] : ""))).forEach((k) => record(sn, { t: "set", path: ["Upgrades", String(i), k], v: next[k] })));
+      runAction(fmt(T.changeToValue, statLine(next)), () => Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(u[k] ?? (Array.isArray(next[k]) ? [] : ""))).forEach((k) => record(sn, { t: "set", path: ["Upgrades", String(i), k], v: next[k] })));
     }));
 }
-const enumSelect = (vals, cur) => h("select", { class: "input" }, cur == null ? h("option", { value: "" }, "(none)") : null, [...new Set([cur, ...vals])].filter(Boolean).map((v) => h("option", { value: v, selected: v === cur }, enumLabel(v))));
-const COMPAT_SECTIONS = [["suit", "Warframe", "Warframes"], ["suit", "Archwing", "Archwings"], ["suit", "Necramech", "Necramechs"], ["suit", "Sentinel", "Sentinels"], ["suit", "Companion", "Companions"], ["weapon", "Primary", "Primary Weapons"], ["weapon", "Secondary", "Secondary Weapons"], ["weapon", "Melee", "Melee Weapons"], ["weapon", "Arch-gun", "Arch-guns"], ["weapon", "Arch-melee", "Arch-melee Weapons"], ["weapon", "Companion", "Companion Weapons"], ["weapon", "Operator", "Amps"], ["weapon", "Drifter", "Drifter Weapons"]];
+const enumSelect = (vals, cur) => h("select", { class: "input" }, cur == null ? h("option", { value: "" }, T.none) : null, [...new Set([cur, ...vals])].filter(Boolean).map((v) => h("option", { value: v, selected: v === cur }, enumLabel(v))));
+const COMPAT_SECTIONS = [["suit", T.warframe, T.warframes], ["suit", T.archwing, T.archwings], ["suit", T.necramech, T.necramechs], ["suit", T.sentinel, T.sentinels], ["suit", T.companion, T.companions], ["weapon", T.primary, T.primaryWeapons], ["weapon", T.secondary, T.secondaryWeapons], ["weapon", T.melee, T.meleeWeapons], ["weapon", T.archGun, T.archGuns], ["weapon", T.archMelee, T.archMeleeWeapons], ["weapon", T.companion, T.companionWeapons], ["weapon", T.operator, T.amps], ["weapon", T.drifter, T.drifterWeapons]];
 let compatItemsCache = null, compatItemsFor = null;
 function compatItems() {
   if (compatItemsCache && compatItemsFor === listCache.suit + "" + listCache.weapon?.length) return compatItemsCache;
@@ -263,7 +277,7 @@ function compatItems() {
     const found = new Map();
     for (const i of listCache[cat] || []) {
       if (i.sub !== sub) continue;
-      const parent = i.raw.parentName, key = cat === "suit" && sub === "Warframe" && /BaseSuit$/.test(parent || "") && !groups.has(i.path) ? parent : i.path;
+      const parent = i.raw.parentName, key = cat === "suit" && sub === T.warframe && /BaseSuit$/.test(parent || "") && !groups.has(i.path) ? parent : i.path;
       const name = key === i.path ? i.name : groups.get(key) || i.name, old = found.get(key);
       if (!old || name.length < old.length) found.set(key, name);
     }
@@ -286,7 +300,7 @@ function compatSelect(cur, cls = "input") {
     return list.length ? h("optgroup", { label: title }, list.map(option)) : null;
   });
   const rest = [...new Set([cur, ...groups.keys()])].filter((v) => v && !placed.has(v)).map((v) => [v, groups.get(v) || tail(v)]).sort(byName);
-  return h("select", { class: cls }, h("optgroup", { label: "Main groups" }, MAIN_COMPAT.map(option)), parts, rest.length ? h("optgroup", { label: "Other" }, rest.map(option)) : null);
+  return h("select", { class: cls }, h("optgroup", { label: T.mainGroups }, MAIN_COMPAT.map(option)), parts, rest.length ? h("optgroup", { label: T.other }, rest.map(option)) : null);
 }
 function infoForm(sn) {
   const e = ed.sides[sn].edit;
@@ -301,24 +315,24 @@ function infoForm(sn) {
   const curType = modType(e);
   const type = h("select", { class: "input" }, MOD_TYPES.map(([v, l]) => h("option", { value: v, selected: v === curType }, v ? l : builtInType(ed.path) || l)));
   const oldName = name.value, oldDesc = desc.value;
-  return actionBox(h("div", { class: "sec-title" }, "Change info"),
-    field("Name", name), field("Description", desc), field("Rarity", rarity), pol ? field("Polarity", pol) : null, drain ? field("Base drain", drain) : null,
-    isMod ? field("Compatible with", compat) : null, isMod ? field("Mod type", type) : null,
-    formButtons("Apply", () => {
+  return actionBox(h("div", { class: "sec-title" }, T.changeInfo),
+    field(T.name, name), field(T.description, desc), field(T.rarity, rarity), pol ? field(T.polarity, pol) : null, drain ? field(T.baseDrain, drain) : null,
+    isMod ? field(T.compatibility, compat) : null, isMod ? field(T.modType, type) : null,
+    formButtons(T.apply, () => {
       const n = name.value.trim(), d = desc.value.trim(), edits = [];
-      if (n && n !== oldName) edits.push(["LocalizeTag", n, "Name: " + n]);
-      if (d !== oldDesc) edits.push(["LocalizeDescTag", d, "Description changed"]);
-      if (rarity.value && rarity.value !== e.Rarity) edits.push(["Rarity", rarity.value, "Rarity: " + enumLabel(rarity.value)]);
-      if (pol?.value && pol.value !== e.ArtifactPolarity) edits.push(["ArtifactPolarity", pol.value, "Polarity: " + enumLabel(pol.value)]);
-      if (drain?.value && drain.value !== e.BaseDrain) edits.push(["BaseDrain", drain.value, "Base drain: " + enumLabel(drain.value)]);
-      if (isMod && compat.value !== curCompat) edits.push(["ItemCompatibility", compat.value, "Compatible with: " + compat.selectedOptions[0].textContent]);
+      if (n && n !== oldName) edits.push(["LocalizeTag", n, T.name + ": " + n]);
+      if (d !== oldDesc) edits.push(["LocalizeDescTag", d, T.descriptionChanged]);
+      if (rarity.value && rarity.value !== e.Rarity) edits.push(["Rarity", rarity.value, T.rarity + ": " + enumLabel(rarity.value)]);
+      if (pol?.value && pol.value !== e.ArtifactPolarity) edits.push(["ArtifactPolarity", pol.value, T.polarity + ": " + enumLabel(pol.value)]);
+      if (drain?.value && drain.value !== e.BaseDrain) edits.push(["BaseDrain", drain.value, T.baseDrain + ": " + enumLabel(drain.value)]);
+      if (isMod && compat.value !== curCompat) edits.push(["ItemCompatibility", compat.value, T.compatibility + ": " + compat.selectedOptions[0].textContent]);
       if (isMod && type.value !== curType) {
         if (curType) edits.push([curType, 0, ""]);
         if (type.value) edits.push([type.value, 1, ""]);
         edits.push(null);
       }
       const typeChanged = edits.includes(null), list = edits.filter(Boolean);
-      if (typeChanged) list.at(-1)[2] = "Mod type: " + type.selectedOptions[0].textContent;
+      if (typeChanged) list.at(-1)[2] = T.modType + ": " + type.selectedOptions[0].textContent;
       if (!list.length) { closeForm(); return; }
       runAction(list.map((x) => x[2]).filter(Boolean).join(", "), () => list.forEach(([k, v]) => record(sn, { t: "set", path: [k], v })));
     }));
@@ -374,13 +388,13 @@ const CARD_LABELS = [
 ];
 const TEXT_COLORS = { Common: "#dda085", Uncommon: "#e4e4e4", Rare: "#fdebbd", Omega: "#ac83d5" };
 const MAIN_COMPAT = [
-  ["/Lotus/Types/Game/PowerSuits/PlayerPowerSuit", "Warframe"], ["/Lotus/Types/Game/Pets/PetPowerSuit", "Companion"], ["/Lotus/Types/Game/SentinelPowerSuit", "Sentinel"],
-  ["/Lotus/Types/Game/KubrowPet/KubrowPetPowerSuit", "Kubrow"], ["/Lotus/Types/Game/CatbrowPet/CatbrowPetPowerSuit", "Kavat"], ["/Lotus/Types/Game/Pets/RoboticPetPowerSuit", "Robotic Companion"],
-  ["/Lotus/Types/Game/LotusWeapon", "Any Weapon"], ["/Lotus/Weapons/Tenno/LotusLongGun", "Primary"], ["/Lotus/Weapons/Tenno/Pistol/LotusPistol", "Secondary"], ["/Lotus/Types/Game/LotusMeleeWeapon", "Melee"],
-  ["/Lotus/Types/Game/FlightJetPackItems/PlayerFlightJetPackItem", "Archwing"], ["/Lotus/Powersuits/EntratiMech/BaseMechSuit", "Necramech"], ["/Lotus/Types/Vehicles/Hoverboard/HoverboardSuit", "K-Drive"],
-  ["/Lotus/Powersuits/Operator/OperatorSuit", "Operator"], ["/Lotus/Types/Game/CrewShip/CrewShip", "Railjack"],
+  ["/Lotus/Types/Game/PowerSuits/PlayerPowerSuit", T.warframe], ["/Lotus/Types/Game/Pets/PetPowerSuit", T.companion], ["/Lotus/Types/Game/SentinelPowerSuit", T.sentinel],
+  ["/Lotus/Types/Game/KubrowPet/KubrowPetPowerSuit", T.kubrow], ["/Lotus/Types/Game/CatbrowPet/CatbrowPetPowerSuit", T.kavat], ["/Lotus/Types/Game/Pets/RoboticPetPowerSuit", T.roboticCompanion],
+  ["/Lotus/Types/Game/LotusWeapon", T.anyWeapon], ["/Lotus/Weapons/Tenno/LotusLongGun", T.primary], ["/Lotus/Weapons/Tenno/Pistol/LotusPistol", T.secondary], ["/Lotus/Types/Game/LotusMeleeWeapon", T.melee],
+  ["/Lotus/Types/Game/FlightJetPackItems/PlayerFlightJetPackItem", T.archwing], ["/Lotus/Powersuits/EntratiMech/BaseMechSuit", T.necramech], ["/Lotus/Types/Vehicles/Hoverboard/HoverboardSuit", T.kDrive],
+  ["/Lotus/Powersuits/Operator/OperatorSuit", T.operator], ["/Lotus/Types/Game/CrewShip/CrewShip", T.railjack],
 ];
-const MOD_TYPES = [["", "Standard"], ["IsAmalgam", "Amalgam"], ["IsGalvanized", "Galvanized"], ["IsGrimoire", "Grimoire"], ["IsImmortal", "Immortal"]];
+const MOD_TYPES = [["", T.standard], ["IsAmalgam", "Amalgam"], ["IsGalvanized", "Galvanized"], ["IsGrimoire", "Grimoire"], ["IsImmortal", "Immortal"]];
 let compatCache = null, compatSource = null;
 function compatGroups() {
   if (compatCache && compatSource === listCache.upgrade) return compatCache;
@@ -397,7 +411,7 @@ function cardLabel(path, rarity, e) {
   const m = CARD_LABELS.find(([re]) => re.test(path));
   if (m) return m[1];
   const label = ENUM_NAMES[rarity] || "Common";
-  if (/\/Mods\/Railjack\//.test(path)) return "Avionics" + (label === "Legendary" ? "Rare" : label);
+  if (/\/Mods\/Railjack\//.test(path)) return T.avionics + (label === "Legendary" ? "Rare" : label);
   if (/\/Mods\/Antiques\//.test(path)) return rarity === "COMMON" ? "AntiquesSilver" : rarity === "UNCOMMON" ? "AntiquesRed" : "AntiquesBlue";
   return label;
 }
@@ -464,9 +478,11 @@ function cardBack(r) {
 }
 function cardStatText(u) {
   const text = loc(u.LocTag);
-  if (!text || (u.OverrideLocalization === 0)) return statLine(u).replace(/ (at max rank|per rank)$/, "");
+  if (!text || (u.OverrideLocalization === 0)) {
+    return withDamageIcon(statLine(u).replace(rankSuffix(), ""), u);
+  }
   const max = modMaxRank(), v = typeof u.Value === "number" ? u.Value * (scalesWithRank(u.OperationType) && max != null ? max + 1 : 1) * (showsPercent(u) ? 100 : 1) : 0;
-  return stripTags(text.replace(/\|val\|/gi, (v >= 0 ? "+" : "") + fmtNum(v)));
+  return text.replace(/\|val\|/gi, (v >= 0 ? "+" : "") + fmtNum(v));
 }
 function modCard(e) {
   const rank = modMaxRank(), drain = cardDrain(e), raw = ed.entry?.raw;
@@ -483,8 +499,8 @@ function modCard(e) {
     stone ? null : h("i", { class: "mod-rail mod-rail-left" }), stone ? null : h("i", { class: "mod-rail mod-rail-right" }),
     h("div", { class: "mod-body" },
       h("div", { class: "mod-name" }, text(e.LocalizeTag) || tail(ed.path)),
-      text(e.LocalizeDescTag) ? h("div", { class: "mod-desc" }, stripTags(text(e.LocalizeDescTag))) : null,
-      stats.map((u) => h("div", { class: "mod-stat" }, cardStatText(u)))),
+      text(e.LocalizeDescTag) ? h("div", { class: "mod-desc" }, textNodes(text(e.LocalizeDescTag))) : null,
+      stats.map((u) => h("div", { class: "mod-stat" }, textNodes(cardStatText(u))))),
     stone ? null : h("img", { class: "mod-tagbg", src: cardArt(86), alt: "", onerror: artMissing }),
     tag ? h("div", { class: "mod-tag" }, tag.toUpperCase()) : null,
     cardPiece(style.bottom, "mod-piece mod-piece-bottom", 254, true),
@@ -501,36 +517,37 @@ function usualValues() {
     if (!cur || r.n > cur.n) rows.set(key, r);
   }
   const top = [...rows.values()].filter((r) => r.n >= 5 && !INTERNAL_STATS.has(r.t) && statName(r.t)).sort((a, b) => statName(a.t).localeCompare(statName(b.t)) || a.d.localeCompare(b.d));
-  return h("details", { class: "action-info" }, h("summary", {}, "Information"),
-    h("p", { class: "muted small" }, "How the game normally applies each stat."),
-    h("div", { class: "action-info-list" }, top.map((r) => h("div", {}, h("span", {}, (r.d !== "DT_ANY" ? enumLabel(r.d) + " " : "") + (r.t === "WEAPON_PERCENT_BASE_DAMAGE_ADDED" ? "Damage" : statName(r.t))), h("span", { class: "muted" }, enumLabel(r.o))))));
+  return h("details", { class: "action-info" }, h("summary", {}, T.information),
+    h("p", { class: "muted small" }, T.statInfoHint),
+    h("div", { class: "action-info-list" }, top.map((r) => h("div", {}, h("span", {}, (r.d !== "DT_ANY" ? enumLabel(r.d) + " " : "") + (r.t === "WEAPON_PERCENT_BASE_DAMAGE_ADDED" ? T.damage : statName(r.t))), h("span", { class: "muted" }, enumLabel(r.o))))));
 }
+const withDamageIcon = (line, u) => { const name = u.DamageType && u.DamageType !== "DT_ANY" ? enumLabel(u.DamageType) : ""; return name ? line.replace(name, "<" + u.DamageType + "_COLOR>" + name) : line; };
 function statValue(u) {
-  const m = statLine(u).match(/^(.*) (at max rank|per rank)$/);
-  return m ? h("span", {}, m[1], h("small", { class: "muted" }, m[2])) : h("span", {}, statLine(u));
+  const m = statLine(u).match(new RegExp("^(.*) (" + T.atMaxRank + "|" + T.perRank + ")$"));
+  return h("span", {}, h("div", {}, textNodes(withDamageIcon(m ? m[1] : statLine(u), u))), m ? h("small", { class: "muted" }, m[2]) : null);
 }
 function changesBar() {
   const changes = ed.actions || [], redo = ed.redo || [];
   if (!changes.length && !redo.length) return null;
   return h("div", { class: "action-undo" }, h("details", { open: changesOpen, ontoggle: (ev) => (changesOpen = ev.target.open) },
-      h("summary", { class: "muted small" }, changes.length === 1 ? "1 change" : changes.length + " changes"),
-      h("div", { class: "action-log" }, changes.map((a) => h("div", {}, h("span", {}, a.label), h("button", { class: "btn-x", type: "button", title: "Undo this change", onclick: () => undoAction(a.id) }, "×"))))),
-    changes.length ? h("button", { class: "btn btn-ghost", type: "button", title: changes.at(-1).label, onclick: () => undoAction(changes.at(-1).id) }, "Undo") : null,
-    redo.length ? h("button", { class: "btn btn-ghost", type: "button", title: redo.at(-1).action.label, onclick: redoAction }, "Redo") : null,
-    changes.length ? h("button", { class: "btn btn-ghost", type: "button", onclick: undoAllActions }, "Undo all") : null);
+      h("summary", { class: "muted small" }, changes.length === 1 ? T.oneChange : fmt(T.countChanges, changes.length)),
+      h("div", { class: "action-log" }, changes.map((a) => h("div", {}, h("span", {}, a.label), h("button", { class: "btn-x", type: "button", title: T.undoThisChange, onclick: () => undoAction(a.id) }, "×"))))),
+    changes.length ? h("button", { class: "btn btn-ghost", type: "button", title: changes.at(-1).label, onclick: () => undoAction(changes.at(-1).id) }, T.undo) : null,
+    redo.length ? h("button", { class: "btn btn-ghost", type: "button", title: redo.at(-1).action.label, onclick: redoAction }, T.redo) : null,
+    changes.length ? h("button", { class: "btn btn-ghost", type: "button", onclick: undoAllActions }, T.undoAll) : null);
 }
 const INFO_KEYS = new Set(["LocalizeTag", "LocalizeDescTag", "PassiveAbilityLocTag"]);
-const ITEM_TITLES = { stats: "Change stats", abilities: "Change abilities", slots: "Change polarity slots", info: "Change info" };
+const ITEM_TITLES = { stats: T.changeStats, abilities: T.changeAbilities, slots: T.changePolaritySlots, info: T.changeInfo };
 function itemIntents(e) {
   const layout = basicLayout(e), general = layout[0][1];
   const usable = (r) => hasAt(e, r[1]) && !isObj(getAt(e, r[1]));
   const group = (title) => (layout.find(([t]) => t === title)?.[1] || []).filter(usable);
   const stats = general.filter((r) => !INFO_KEYS.has(r[1][0]) && r[1][0] !== "Icon");
   for (const [title, rows] of layout.slice(1)) {
-    if (title === "Polarity slots" || title === "Abilities") continue;
-    stats.push(...rows.map((r) => (title === "Stats" ? r : [title + ": " + r[0], r[1], r[2]])));
+    if (title === T.polaritySlots || title === T.abilities) continue;
+    stats.push(...rows.map((r) => (title === T.stats ? r : [title + ": " + r[0], r[1], r[2]])));
   }
-  return { stats: stats.filter(usable), abilities: group("Abilities"), slots: group("Polarity slots"), info: general.filter((r) => INFO_KEYS.has(r[1][0])) };
+  return { stats: stats.filter(usable), abilities: group(T.abilities), slots: group(T.polaritySlots), info: general.filter((r) => INFO_KEYS.has(r[1][0])) };
 }
 const abilityPath = (sn, v) => (String(v).startsWith("/") ? v : relTo(ed.sides[sn].origin?.AbilityTypes || ed.path, v));
 function abilityNames() {
@@ -555,13 +572,13 @@ function itemForm(sn, kind) {
     return { label, path, mirror: mirror || [], el, old: el.value, number: typeof getAt(e, path) === "number" };
   });
   return actionBox(h("div", { class: "sec-title" }, ITEM_TITLES[kind]), inputs.map((x) => field(x.label, x.el)),
-    formButtons("Apply", () => {
+    formButtons(T.apply, () => {
       const bad = inputs.find((x) => x.number && (!x.el.value.trim() || isNaN(Number(x.el.value))));
-      if (bad) { toast("Enter a number for " + titleCase(bad.label)); return; }
+      if (bad) { toast(fmt(T.enterNumberFor, titleCase(bad.label))); return; }
       const changed = inputs.filter((x) => (x.number ? Number(x.el.value) !== Number(x.old) : x.el.value !== x.old));
       if (!changed.length) { closeForm(); return; }
       const shown = (x) => (x.el.tagName === "SELECT" ? x.el.selectedOptions[0].textContent : x.el.value);
-      const label = changed.length > 3 ? changed.length + " values changed" : changed.map((x) => titleCase(x.label) + ": " + shown(x)).join(", ");
+      const label = changed.length > 3 ? fmt(T.valuesChangedN, changed.length) : changed.map((x) => titleCase(x.label) + ": " + shown(x)).join(", ");
       runAction(label, () => {
         if (kind === "abilities") { record(sn, { t: "set", path: ["AbilityTypes"], v: inputs.map((x) => x.el.value) }); return; }
         for (const x of changed) for (const path of [x.path, ...x.mirror]) record(sn, { t: "set", path, v: x.number ? Number(x.el.value) : x.el.value });
@@ -575,13 +592,13 @@ function renderItemActions(sn) {
   const names = it.abilities.length ? abilityNames() : null;
   return h("div", { class: "sec actions-view", "data-side": sn },
     actionForm?.kind === "item" ? itemForm(sn, actionForm.item)
-      : h("div", { class: "action-list" }, h("div", { class: "sec-title" }, "What do you want to do?"),
+      : h("div", { class: "action-list" }, h("div", { class: "sec-title" }, T.actionQuestion),
         h("div", { class: "action-row" }, Object.keys(ITEM_TITLES).map((k) => (it[k].length ? h("button", { class: "btn", type: "button", onclick: open(k) }, ITEM_TITLES[k]) : null)))),
-    h("div", { class: "action-summary" }, h("div", { class: "sec-title" }, "Current stats"),
-      it.stats.length ? null : h("div", { class: "muted small" }, "This item has no stats to show here."),
+    h("div", { class: "action-summary" }, h("div", { class: "sec-title" }, T.currentStats),
+      it.stats.length ? null : h("div", { class: "muted small" }, T.noStatsShown),
       it.stats.map(([label, path]) => row(label, String(getAt(e, path)))),
       it.abilities.map(([label, path]) => { const p = abilityPath(sn, getAt(e, path)); return row(label, names.get(p) || tail(p)); }),
-      it.slots.length ? row("Polarity slots", it.slots.map(([, path]) => enumLabel(getAt(e, path))).join(", ")) : null),
+      it.slots.length ? row(T.polaritySlots, it.slots.map(([, path]) => enumLabel(getAt(e, path))).join(", ")) : null),
     changesBar());
 }
 function renderActions(sn) {
@@ -591,14 +608,14 @@ function renderActions(sn) {
   const choice = (title, form) => h("button", { class: "btn", type: "button", onclick: open(form) }, title);
   return h("div", { class: "sec actions-view", "data-side": sn },
     actionForm?.kind === "add" ? addStatForm(sn) : actionForm?.kind === "change" ? changeStatForm(sn, actionForm.i) : actionForm?.kind === "info" ? infoForm(sn)
-      : h("div", { class: "action-list" }, h("div", { class: "sec-title" }, "What do you want to do?"),
-        h("div", { class: "action-row" }, choice("Add a stat", { kind: "add" }), choice("Change info", { kind: "info" }))),
+      : h("div", { class: "action-list" }, h("div", { class: "sec-title" }, T.actionQuestion),
+        h("div", { class: "action-row" }, choice(T.addStatTitle, { kind: "add" }), choice(T.changeInfo, { kind: "info" }))),
     h("div", { class: "action-summary" },
-      h("div", { class: "sec-title" }, "Current stats"),
-      stats.length ? null : h("div", { class: "muted small" }, "This item has no stats yet."),
+      h("div", { class: "sec-title" }, T.currentStats),
+      stats.length ? null : h("div", { class: "muted small" }, T.noStatsYet),
       stats.map((u, i) => (isObj(u) ? h("div", { class: "action-stat" }, statValue(u),
-        typeof u.Value === "number" ? h("button", { class: "btn btn-ghost", type: "button", onclick: open({ kind: "change", i }) }, "Change") : null,
-        h("button", { class: "btn btn-ghost", type: "button", onclick: () => runAction("Remove " + statLine(u), () => record(sn, { t: "del", path: ["Upgrades", String(i)] })) }, "Remove")) : null))),
+        typeof u.Value === "number" ? h("button", { class: "btn btn-ghost", type: "button", onclick: open({ kind: "change", i }) }, T.change) : null,
+        h("button", { class: "btn btn-ghost", type: "button", onclick: () => runAction(fmt(T.removeAction, statLine(u)), () => record(sn, { t: "del", path: ["Upgrades", String(i)] })) }, T.remove)) : null))),
     changesBar());
 }
 $("#out-tabs").addEventListener("click", (e) => { if (e.target.dataset.tab) { outTabs[outMode()] = e.target.dataset.tab; syncPreview(); } });

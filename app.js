@@ -1,116 +1,116 @@
 "use strict";
-
+const T = window.TEXT;
+const fmt = (text, ...args) => text.replace(/\{(\d)\}/g, (m, i) => args[i]);
+const fmtNodes = (text, ...args) => text.split(/(\{\d\})/).map((x) => (/^\{\d\}$/.test(x) ? args[x[1]] : x)).filter((x) => x !== "");
 const BIN = "https://raw.githubusercontent.com/calamity-inc/warframe-packages-bin-data/senpai";
 const PEP = "https://raw.githubusercontent.com/calamity-inc/warframe-public-export-plus/senpai";
 const IMG = "https://browse.wf";
-
 const CATS = {
   weapon: {
     exports: ["ExportWeapons"],
-    sub: { LongGuns: "Primary", Pistols: "Secondary", Melee: "Melee", SpaceGuns: "Arch-gun", SpaceMelee: "Arch-melee", SentinelWeapons: "Companion", OperatorAmps: "Operator", DrifterMelee: "Drifter", SpecialItems: "Other" },
+    sub: { LongGuns: T.primary, Pistols: T.secondary, Melee: T.melee, SpaceGuns: T.archGun, SpaceMelee: T.archMelee, SentinelWeapons: T.companion, OperatorAmps: T.operator, DrifterMelee: T.drifter, SpecialItems: T.other },
   },
   suit: {
     exports: ["ExportWarframes", "ExportSentinels"],
-    sub: { Suits: "Warframe", SpaceSuits: "Archwing", MechSuits: "Necramech", Sentinels: "Sentinel", KubrowPets: "Companion", MoaPets: "Companion", SpecialItems: "Other" },
+    sub: { Suits: T.warframe, SpaceSuits: T.archwing, MechSuits: T.necramech, Sentinels: T.sentinel, KubrowPets: T.companion, MoaPets: T.companion, SpecialItems: T.other },
   },
   upgrade: {
     exports: ["ExportUpgrades", "ExportArcanes"],
     sub: {},
   },
 };
-
 const LABELS = {
-  LocalizeTag: "Name", LocalizeDescTag: "Description", LongDesc: "Codex description", Icon: "Icon",
-  ArtifactPolarity: "Polarity", ArtifactSlots: "Polarity slots", BaseDrain: "Base drain", FusionLimit: "Max rank",
-  Rarity: "Rarity", ItemCompatibility: "Compatible with", ItemCompatibilities: "Compatible with (list)",
-  IncompatibilityTags: "Incompatible with", CompatibilityTags: "Compatibility tags", OmegaAttenuation: "Riven disposition",
-  MaxHealthOverride: "Health", MaxShieldOverride: "Shields", ArmourRatingOverride: "Armor", MaxEnergy: "Max energy",
-  InitialEnergy: "Starting energy", MaxStaminaOverride: "Stamina", MovementSpeedMultiplier: "Sprint speed",
-  AbilityTypes: "Abilities", PassiveAbilityLocTag: "Passive description", MarketMode: "Market visibility",
-  ExcludeFromCodex: "Hide from codex", RequiredLevel: "Mastery requirement", PremiumPrice: "Platinum price",
-  RegularPrice: "Credit price", SellingPrice: "Sell price", PrimeSellingPrice: "Ducat value", Tradeable: "Tradeable",
-  Giftable: "Giftable", ShowInMarket: "Show in market", SearchTags: "Search tags", Upgrades: "Stats",
-  ConditionalUpgrades: "Conditional stats", UpgradeEntries: "Upgrade entries", UpgradeChance: "Proc chance",
-  UpgradeDuration: "Effect duration", ModSet: "Mod set", IsUtility: "Utility mod", IsStarter: "Starter (flawed)",
-  CodexSecret: "Secret in codex", AvailableOnPvp: "Available in Conclave", AvailableOnPve: "Available in PvE",
-  ProductCategory: "Category", TypeName: "Item type", DefaultUpgrades: "Default mods", DefaultSlottedUpgrades: "Default mods",
-  DefaultWeapon: "Default weapon", AdditionalItems: "Bundled items", AmmoClipSize: "Magazine size",
-  CriticalChance: "Critical chance", CriticalMultiplier: "Critical multiplier", Behaviors: "Behaviors (firing, damage…)",
-  RecipeHelpText: "Recipe help text", UiName: "UI name", IsPrime: "Is prime", Diorama: "Diorama",
-  DamageType: "Damage type", UpgradeType: "Stat", OperationType: "How it applies", Value: "Value",
-  DisplayAsPercent: "Show as %", DisplayAsMultiplier: "Show as ×", LocTag: "Stat text", ValidType: "Only for type",
-  ValidModifiers: "When", SmallerIsBetter: "Lower is better",
-  RoundTo: "Round to", ReverseValueSymbol: "Reverse +/−", BuildPrice: "Build price (credits)", BuildTime: "Build time (s)",
-  SkipBuildTimePrice: "Rush price (platinum)", Ingredients: "Ingredients", ResultItem: "Result item",
-  SymbolFilter: "Condition", ValidProcTypes: "Status type", UpgradeObject: "Target", Quality: "Quality", Polarities: "Polarities", HudBuffIcon: "Buff icon", StatusDescTag: "Status description",
+  LocalizeTag: T.name, LocalizeDescTag: T.description, LongDesc: T.codexDescription, Icon: "Icon",
+  ArtifactPolarity: T.polarity, ArtifactSlots: T.polaritySlots, BaseDrain: T.baseDrain, FusionLimit: T.maxRank,
+  Rarity: T.rarity, ItemCompatibility: T.compatibility, ItemCompatibilities: T.compatibilityList,
+  IncompatibilityTags: T.incompatibility, CompatibilityTags: T.compatibilityTags, OmegaAttenuation: T.rivenDisposition,
+  MaxHealthOverride: T.health, MaxShieldOverride: T.shields, ArmourRatingOverride: T.armor, MaxEnergy: T.maxEnergy,
+  InitialEnergy: T.startingEnergy, MaxStaminaOverride: T.stamina, MovementSpeedMultiplier: T.sprintSpeed,
+  AbilityTypes: T.abilities, PassiveAbilityLocTag: T.passiveDescription, MarketMode: T.marketVisibility,
+  ExcludeFromCodex: T.hideFromCodex, RequiredLevel: T.masteryRequirement, PremiumPrice: T.platinumPrice,
+  RegularPrice: T.creditPrice, SellingPrice: T.sellPrice, PrimeSellingPrice: T.ducatValue, Tradeable: T.tradeable,
+  Giftable: T.giftable, ShowInMarket: T.showInMarket, SearchTags: T.searchTags, Upgrades: T.stats,
+  ConditionalUpgrades: T.conditionalStats, UpgradeEntries: T.upgradeEntries, UpgradeChance: T.procChance,
+  UpgradeDuration: T.effectDuration, ModSet: T.modSet, IsUtility: T.utilityMod, IsStarter: T.starterFlawed,
+  CodexSecret: T.secretInCodex, AvailableOnPvp: T.availableInConclave, AvailableOnPve: T.availableInPve,
+  ProductCategory: T.category, TypeName: T.itemType, DefaultUpgrades: T.defaultMods, DefaultSlottedUpgrades: T.defaultMods,
+  DefaultWeapon: T.defaultWeapon, AdditionalItems: T.bundledItems, AmmoClipSize: T.magazineSize,
+  CriticalChance: T.criticalChance, CriticalMultiplier: T.criticalMultiplier, Behaviors: T.behaviors,
+  RecipeHelpText: T.recipeHelpText, UiName: T.uiName, IsPrime: T.isPrime, Diorama: T.diorama,
+  DamageType: T.damageType, UpgradeType: T.stat, OperationType: T.applyMode, Value: T.value,
+  DisplayAsPercent: T.showAsPerc, DisplayAsMultiplier: T.showAsMult, LocTag: T.statText, ValidType: T.onlyForType,
+  ValidModifiers: T.when, SmallerIsBetter: T.lowerIsBetter,
+  RoundTo: T.roundTo, ReverseValueSymbol: T.reverseSymbol, BuildPrice: T.buildPrice, BuildTime: T.buildTime,
+  SkipBuildTimePrice: T.rushPrice, Ingredients: T.ingredients, ResultItem: T.resultItem,
+  SymbolFilter: T.condition, ValidProcTypes: T.statusType, UpgradeObject: T.target, Quality: T.quality, Polarities: T.polarities, HudBuffIcon: T.buffIcon, StatusDescTag: T.statusDescription,
 };
 const humanize = (k) => k.replace(/^.*:/, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ").replace(/\s+/g, " ").trim().toLowerCase().replace(/^./, (c) => c.toUpperCase());
 const HIDDEN = (k) => /DateAdded|^Default\w*Colou?r|^AdditionalItems$/i.test(k);
 const ENUMS = window.ENUMS_DATA || {};
 
 const OP_NAMES = {
-  STACKING_MULTIPLY: "Multiplicative", ADD: "Additive", MULTIPLY: "Multiply", ADD_BASE: "Add to Base",
-  SET: "Set to Value", SET_BASE: "Set Base Value", SET_MAX: "Cap at Most", SET_MIN: "Raise to at Least",
+  STACKING_MULTIPLY: T.multiplicative, ADD: T.additive, MULTIPLY: T.multiply, ADD_BASE: T.addToBase,
+  SET: T.setToValue, SET_BASE: T.setBaseValue, SET_MAX: T.capAtMost, SET_MIN: T.raiseToLeast,
 };
 const STAT_NAMES = {
-  AVATAR_POWER_MAX: "Energy max", AVATAR_POWER_RATE: "Energy regen", AVATAR_ABILITY_STRENGTH: "Ability strength",
-  AVATAR_ABILITY_DURATION: "Ability duration", AVATAR_ABILITY_EFFICIENCY: "Ability efficiency", AVATAR_ABILITY_RANGE: "Ability range",
-  AVATAR_ARMOUR: "Armor", AVATAR_HEALTH_MAX: "Health", AVATAR_SHIELD_MAX: "Shield capacity", AVATAR_SHIELD_RECHARGE_RATE: "Shield recharge",
-  AVATAR_SHIELD_RECHARGE_DELAY: "Shield recharge delay", AVATAR_OVERSHIELD_MAX: "Overshield max", AVATAR_SPRINT_SPEED: "Sprint speed",
-  AVATAR_CASTING_SPEED: "Casting speed", AVATAR_PARKOUR_BOOST: "Bullet jump", AVATAR_AURA_STRENGTH: "Aura strength",
-  AVATAR_STAMINA_MAX: "Stamina", AVATAR_DAMAGE_TAKEN: "Damage taken", AVATAR_MOVEMENT_SPEED: "Movement speed",
-  WEAPON_CRIT_CHANCE: "Critical chance", WEAPON_CRIT_DAMAGE: "Critical damage", WEAPON_PROC_CHANCE: "Status chance",
-  WEAPON_PROC_TIME: "Status duration", WEAPON_PROC_DAMAGE: "Status damage", WEAPON_FIRE_ITERATIONS: "Multishot",
-  WEAPON_FIRE_RATE: "Fire rate / attack speed", WEAPON_CLIP_MAX: "Magazine capacity", WEAPON_AMMO_MAX: "Ammo max",
-  WEAPON_RELOAD_SPEED: "Reload speed", WEAPON_DAMAGE_AMOUNT: "Damage", WEAPON_PERCENT_BASE_DAMAGE_ADDED: "Added damage (elemental / physical)",
-  WEAPON_MELEE_DAMAGE: "Melee damage", WEAPON_PUNCTURE_DEPTH: "Punch through", WEAPON_RECOIL: "Recoil", WEAPON_SPREAD: "Accuracy (spread)",
-  WEAPON_ZOOM: "Zoom", WEAPON_RANGE: "Range", WEAPON_HEADSHOT_MULTIPLIER: "Headshot damage", WEAPON_PROJECTILE_SPEED: "Projectile speed",
-  WEAPON_CHARGE_RATE: "Charge rate", WEAPON_HOLSTER_RATE: "Holster speed", GAMEPLAY_FACTION_DAMAGE: "Faction damage",
-  WEAPON_MELEE_COMBO_DURATION_BONUS: "Combo duration", WEAPON_MELEE_HEAVY_CHARGE_SPEED: "Heavy attack wind up", WEAPON_LIFE_STEAL: "Life steal",
-  WEAPON_EXPLOSION_RADIUS: "Blast radius", WEAPON_NOISE_REDUCTION: "Noise reduction", WEAPON_MELEE_FINISHER_DAMAGE: "Finisher damage",
-  WEAPON_MELEE_SLAM_DAMAGE_BONUS: "Slam damage", WEAPON_AMMO_CONSUME_RATE: "Ammo efficiency", NONE: "None",
-  AVATAR_PROC_TIME: "Status duration on self", SKILL_RJ_BC_COOLDOWN: "Battle Avionics cooldown", WEAPON_DAMAGE_WEAKPOINT: "Weak point damage", WEAPON_AUTO_RELOAD_RATE: "Magazine reloaded when holstered", WEAPON_CRIT_CHANCE_BODY_PART: "Critical chance on weak point hits",
+  AVATAR_POWER_MAX: T.energyMax, AVATAR_POWER_RATE: T.energyRegen, AVATAR_ABILITY_STRENGTH: T.abilityStrength,
+  AVATAR_ABILITY_DURATION: T.abilityDuration, AVATAR_ABILITY_EFFICIENCY: T.abilityEfficiency, AVATAR_ABILITY_RANGE: T.abilityRange,
+  AVATAR_ARMOUR: T.armor, AVATAR_HEALTH_MAX: T.health, AVATAR_SHIELD_MAX: T.shieldCapacity, AVATAR_SHIELD_RECHARGE_RATE: T.shieldRecharge,
+  AVATAR_SHIELD_RECHARGE_DELAY: T.shieldRechargeDelay, AVATAR_OVERSHIELD_MAX: T.overshieldMax, AVATAR_SPRINT_SPEED: T.sprintSpeed,
+  AVATAR_CASTING_SPEED: T.castingSpeed, AVATAR_PARKOUR_BOOST: T.bulletJump, AVATAR_AURA_STRENGTH: T.auraStrength,
+  AVATAR_STAMINA_MAX: T.stamina, AVATAR_DAMAGE_TAKEN: T.damageTaken, AVATAR_MOVEMENT_SPEED: T.movementSpeed,
+  WEAPON_CRIT_CHANCE: T.criticalChance, WEAPON_CRIT_DAMAGE: T.criticalDamage, WEAPON_PROC_CHANCE: T.statusChance,
+  WEAPON_PROC_TIME: T.statusDuration, WEAPON_PROC_DAMAGE: T.statusDamage, WEAPON_FIRE_ITERATIONS: T.multishot,
+  WEAPON_FIRE_RATE: T.fireRateSpeed, WEAPON_CLIP_MAX: T.magazineCapacity, WEAPON_AMMO_MAX: T.ammoMax,
+  WEAPON_RELOAD_SPEED: T.reloadSpeed, WEAPON_DAMAGE_AMOUNT: T.damage, WEAPON_PERCENT_BASE_DAMAGE_ADDED: T.addedDamage,
+  WEAPON_MELEE_DAMAGE: T.meleeDamage, WEAPON_PUNCTURE_DEPTH: T.punchThrough, WEAPON_RECOIL: T.recoil, WEAPON_SPREAD: T.accuracySpread,
+  WEAPON_ZOOM: T.zoom, WEAPON_RANGE: T.range, WEAPON_HEADSHOT_MULTIPLIER: T.headshotDamage, WEAPON_PROJECTILE_SPEED: T.projectileSpeed,
+  WEAPON_CHARGE_RATE: T.chargeRate, WEAPON_HOLSTER_RATE: T.holsterSpeed, GAMEPLAY_FACTION_DAMAGE: T.factionDamage,
+  WEAPON_MELEE_COMBO_DURATION_BONUS: T.comboDuration, WEAPON_MELEE_HEAVY_CHARGE_SPEED: T.heavyWindUp, WEAPON_LIFE_STEAL: T.lifeSteal,
+  WEAPON_EXPLOSION_RADIUS: T.blastRadius, WEAPON_NOISE_REDUCTION: T.noiseReduction, WEAPON_MELEE_FINISHER_DAMAGE: T.finisherDamage,
+  WEAPON_MELEE_SLAM_DAMAGE_BONUS: T.slamDamage, WEAPON_AMMO_CONSUME_RATE: T.ammoEfficiency, NONE: T.noneStat,
+  AVATAR_PROC_TIME: T.statusDurationSelf, SKILL_RJ_BC_COOLDOWN: T.avionicsCooldown, WEAPON_DAMAGE_WEAKPOINT: T.weakPointDamage, WEAPON_AUTO_RELOAD_RATE: T.holsterReload, WEAPON_CRIT_CHANCE_BODY_PART: T.weakPointCrit,
 };
 const STAT_GROUPS = [
-  ["Warframe: abilities", /^AVATAR_(ABILITY|CASTING|AURA|POWER_DAMAGE)/],
-  ["Warframe: energy", /^AVATAR_(POWER|ENERGY|SPAWN_ENERGY)/],
-  ["Warframe: survival", /^AVATAR_(HEALTH|HEAL|SHIELD|OVERSHIELD|ARMOUR|DAMAGE|BLEEDOUT|REVIVE|INJURY|KNOCKDOWN|HEAVY_LAND|PROC_IMMUNITY|NO_DEATH|EVADE|MELEE_DAMAGE_REDUCTION|ALLOW_HEALTH|RESPAWN)/],
-  ["Warframe: movement", /^AVATAR_(SPRINT|JUMP|AIR|NUM_JUMPS|SLIDE|PARKOUR|DODGE|ACROBATIC|MOVEMENT|JOG|DASH|FALL|STAMINA)/],
-  ["Companion", /^(AVATAR_SENTINEL|CSUT_)/],
-  ["Warframe: other", /^AVATAR_/],
-  ["Weapon: critical", /^WEAPON_(CRIT|DOUBLE_CRIT|NOCRIT|LOW_CRIT|VICTIM_CRIT)/],
-  ["Weapon: status", /^WEAPON_(PROC|SLASH_PROC|FORCED_PROC|RANDOM_PROC|OVERHEAT_PROC)/],
-  ["Weapon: melee", /^WEAPON_(MELEE|PARRY|CHANNELING)/],
-  ["Weapon: projectile", /^WEAPON_(PROJECTILE|PUNCTURE|RICOCHET|REFLECTION|EXPLOSION|GRENADE|CORPSE)/],
-  ["Weapon: firing and ammo", /^WEAPON_(FIRE|CLIP|AMMO|RELOAD|AUTO_RELOAD|CHARGE|ADD_CHARGE|RECOIL|SPREAD|ZOOM|HOLSTER|INFINITE_CLIP|CONVERT_AMMO|LOCK_TIME|RANGE|NOISE|HEALTH_PCT_FOR_FULL_CLIP)/],
-  ["Weapon: damage", /^WEAPON_/],
-  ["K-Drive", /^VEHICLE_/],
-  ["Gameplay", /^GAMEPLAY_/],
-  ["Railjack", /^SKILL_RJ/],
-  ["Other", /./],
-  ["Special effects", /$^/],
+  [T.warframeAbilities, /^AVATAR_(ABILITY|CASTING|AURA|POWER_DAMAGE)/],
+  [T.warframeEnergy, /^AVATAR_(POWER|ENERGY|SPAWN_ENERGY)/],
+  [T.warframeSurvival, /^AVATAR_(HEALTH|HEAL|SHIELD|OVERSHIELD|ARMOUR|DAMAGE|BLEEDOUT|REVIVE|INJURY|KNOCKDOWN|HEAVY_LAND|PROC_IMMUNITY|NO_DEATH|EVADE|MELEE_DAMAGE_REDUCTION|ALLOW_HEALTH|RESPAWN)/],
+  [T.warframeMovement, /^AVATAR_(SPRINT|JUMP|AIR|NUM_JUMPS|SLIDE|PARKOUR|DODGE|ACROBATIC|MOVEMENT|JOG|DASH|FALL|STAMINA)/],
+  [T.companion, /^(AVATAR_SENTINEL|CSUT_)/],
+  [T.warframeOther, /^AVATAR_/],
+  [T.weaponCritical, /^WEAPON_(CRIT|DOUBLE_CRIT|NOCRIT|LOW_CRIT|VICTIM_CRIT)/],
+  [T.weaponStatus, /^WEAPON_(PROC|SLASH_PROC|FORCED_PROC|RANDOM_PROC|OVERHEAT_PROC)/],
+  [T.weaponMelee, /^WEAPON_(MELEE|PARRY|CHANNELING)/],
+  [T.weaponProjectile, /^WEAPON_(PROJECTILE|PUNCTURE|RICOCHET|REFLECTION|EXPLOSION|GRENADE|CORPSE)/],
+  [T.weaponFiringAmmo, /^WEAPON_(FIRE|CLIP|AMMO|RELOAD|AUTO_RELOAD|CHARGE|ADD_CHARGE|RECOIL|SPREAD|ZOOM|HOLSTER|INFINITE_CLIP|CONVERT_AMMO|LOCK_TIME|RANGE|NOISE|HEALTH_PCT_FOR_FULL_CLIP)/],
+  [T.weaponDamage, /^WEAPON_/],
+  [T.kDrive, /^VEHICLE_/],
+  [T.gameplay, /^GAMEPLAY_/],
+  [T.railjack, /^SKILL_RJ/],
+  [T.other, /./],
+  [T.specialEffects, /$^/],
 ];
 const titleCase = (s) => s.replace(/(^|[\s(\/-])(?!(?:of|at|to|in|and|the|per|or|with)\b)([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\(S\)/g, "(s)");
 const statName = (v) => window.STAT_LABELS?.[v] || (STAT_NAMES[v] ? titleCase(STAT_NAMES[v]) : "");
 const labelOf = (k) => titleCase(LABELS[k] || humanize(k));
 
 const ENUM_NAMES = {
-  AP_ATTACK: "Madurai", AP_DEFENSE: "Vazarin", AP_TACTIC: "Naramon", AP_POWER: "Zenurik", AP_WARD: "Unairu",
-  AP_PRECEPT: "Penjaga", AP_UMBRA: "Umbra", AP_ANY: "Any (Aura)", AP_FUSION: "Fusion", AP_UNIVERSAL: "Universal",
-  DT_IMPACT: "Impact", DT_PUNCTURE: "Puncture", DT_SLASH: "Slash", DT_FIRE: "Heat", DT_FREEZE: "Cold",
-  DT_ELECTRICITY: "Electricity", DT_POISON: "Toxin", DT_EXPLOSION: "Blast", DT_GAS: "Gas", DT_MAGNETIC: "Magnetic",
-  DT_RADIATION: "Radiation", DT_VIRAL: "Viral", DT_CORROSIVE: "Corrosive", DT_FINISHER: "True", DT_RADIANT: "Void",
-  DT_SENTIENT: "Tau", DT_ANY: "Any", COMMON: "Common", UNCOMMON: "Uncommon", RARE: "Rare", LEGENDARY: "Legendary",
-  MM_HIDDEN: "Hidden", MM_VISIBLE: "Visible",
-  QA_NONE: "None", QA_LOW: "Low", QA_MEDIUM: "Medium", QA_HIGH: "High", QA_VERY_HIGH: "Very High",
+  AP_ATTACK: T.madurai, AP_DEFENSE: T.vazarin, AP_TACTIC: T.naramon, AP_POWER: T.zenurik, AP_WARD: T.unairu,
+  AP_PRECEPT: T.penjaga, AP_UMBRA: T.umbra, AP_ANY: T.anyPolarity, AP_FUSION: T.fusion, AP_UNIVERSAL: T.universal,
+  DT_IMPACT: T.impact, DT_PUNCTURE: T.puncture, DT_SLASH: T.slash, DT_FIRE: T.heat, DT_FREEZE: T.cold,
+  DT_ELECTRICITY: T.electricity, DT_POISON: T.toxin, DT_EXPLOSION: T.blast, DT_GAS: T.gas, DT_MAGNETIC: T.magnetic,
+  DT_RADIATION: T.radiation, DT_VIRAL: T.viral, DT_CORROSIVE: T.corrosive, DT_FINISHER: T.true, DT_RADIANT: T.void,
+  DT_SENTIENT: T.tau, DT_ANY: T.any, COMMON: "Common", UNCOMMON: "Uncommon", RARE: "Rare", LEGENDARY: "Legendary",
+  MM_HIDDEN: T.hidden, MM_VISIBLE: T.visible, MM_EXCLUDED: T.excluded, MM_NONE: T.noneStat,
+  QA_NONE: T.noneStat, QA_LOW: T.low, QA_MEDIUM: T.medium, QA_HIGH: T.high, QA_VERY_HIGH: T.veryHigh,
 };
-const enumLabel = (v) => OP_NAMES[v] || ENUM_NAMES[v] || (v === "" ? "(none)" : /^[A-Z0-9_]+$/.test(v) ? titleCase(humanize(v)) : v);
+const enumLabel = (v) => OP_NAMES[v] || ENUM_NAMES[v] || (v === "" ? T.none : /^[A-Z0-9_]+$/.test(v) ? titleCase(humanize(v)) : v);
 
 const COMMON = {
   weapon: ["LocalizeTag", "LocalizeDescTag", "Icon", "ArtifactSlots", "RequiredLevel", "MarketMode", "ExcludeFromCodex"],
   suit: ["LocalizeTag", "LocalizeDescTag", "Icon", "ArtifactSlots", "MaxHealthOverride", "MaxShieldOverride", "ArmourRatingOverride", "MaxEnergy", "InitialEnergy", "MovementSpeedMultiplier", "AbilityTypes", "PassiveAbilityLocTag"],
-  mod: ["LocalizeTag", "LocalizeDescTag", "Icon", "ArtifactPolarity", "BaseDrain", "FusionLimit", "Rarity", "ItemCompatibility", "IncompatibilityTags"],
-  arcane: ["LocalizeTag", "LocalizeDescTag", "Icon", "Rarity", "FusionLimit", "ItemCompatibility"],
+  mod: ["LocalizeTag", "LocalizeDescTag", "Icon", "ArtifactPolarity", "BaseDrain", "FusionLimit", T.rarity, "ItemCompatibility", "IncompatibilityTags"],
+  arcane: ["LocalizeTag", "LocalizeDescTag", "Icon", T.rarity, "FusionLimit", "ItemCompatibility"],
 };
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -173,18 +173,18 @@ const toStorePath = (p) => p.replace(/^\/Lotus\//, "/Lotus/StoreItems/");
 const stripTags = (s) => s.replace(/<[^>]+>\s*/g, "");
 const cleanName = (key, path) => stripTags(loc(key) || tail(path));
 const isArcanePath = (p) => p.includes("/CosmeticEnhancers/") && !p.includes("/Peculiars/");
-const OFFLINE = "Could not reach the game data. Check your connection and try again.";
+const OFFLINE = T.offline;
 const hideBroken = (e) => (e.target.style.visibility = "hidden");
 const setIcon = (el, icon) => { el.style.visibility = ""; el.onerror = hideBroken; el.src = IMG + icon; };
 async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); toast("Copied"); } catch { toast("Copy failed"); }
+  try { await navigator.clipboard.writeText(text); toast(T.copied); } catch { toast(T.copyFailed); }
 }
 function saveText(name, text, fallback) {
   const safe = name.replace(/[\\/:*?"<>|]+/g, "_").trim() || fallback;
   const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
   h("a", { href: url, download: safe + ".txt" }).click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
-  toast("Saved " + safe + ".txt");
+  toast(fmt(T.savedFile, safe + ".txt"));
 }
 
 function eeInline(v) {
@@ -265,8 +265,8 @@ async function loadList(cat) {
     const expName = def.exports[i];
     for (const [path, e] of Object.entries(exp)) {
       let sub;
-      if (cat === "upgrade") sub = expName === "ExportArcanes" || isArcanePath(path) ? "Arcanes" : "Mods";
-      else sub = def.sub[e.productCategory] || "Other";
+      if (cat === "upgrade") sub = expName === "ExportArcanes" || isArcanePath(path) ? T.arcanes : T.mods;
+      else sub = def.sub[e.productCategory] || T.other;
       const name = cleanName(e.name, path);
       const flag = e.isFrivolous ? "impostor" : e.isStarter ? "flawed" : null;
       items.push({ path, name, icon: e.icon, sub, cat, raw: e, flag, search: (name + " " + path + " " + (flag || "")).toLowerCase() });
@@ -276,7 +276,7 @@ async function loadList(cat) {
   return (listCache[cat] = items);
 }
 const loadAllLists = () => Promise.all(Object.keys(CATS).map((c) => loadList(c).catch(() => []))).then((l) => l.flat());
-const loadCompatLists = () => Promise.all(["suit", "weapon", "upgrade"].map((c) => loadList(c).catch(() => [])));
+const loadCompatLists = () => Promise.all([loadTextIcons(), ...["suit", "weapon", "upgrade"].map((c) => loadList(c).catch(() => []))]);
 function fieldGroup(cat, path) {
   if (path.startsWith("/Lotus/StoreItems/")) return "store";
   if (cat === "upgrade") return isArcanePath(path) ? "arcane" : "mod";
@@ -292,10 +292,10 @@ function catOfPath(p) {
 }
 
 const CHOICES = [
-  { cat: "suit", name: "Suit", sub: "Warframes, Archwings, Necramechs, companions", icon: "/Lotus/Interface/Icons/StoreIcons/Warframes/Excalibur.png" },
-  { cat: "weapon", name: "Weapon", sub: "Primary, secondary, melee…", icon: "/Lotus/Interface/Icons/StoreIcons/Weapons/MeleeWeapons/Weapons/Nikana.png" },
-  { cat: "upgrade", name: "Mods / Arcanes", sub: "Stats, rarity and compatibility", icon: "/Lotus/Interface/Cards/Images/AvatarMods/AbilityDurationMod.png" },
-  { href: "#/eye", name: "Sentient Builder", sub: "Add unobtainable or custom items", icon: "/Lotus/Interface/Graphics/AntiqueMods/SentientBackFrame.png" },
+  { cat: "suit", name: "Suit", sub: T.tileSuitDesc, icon: "/Lotus/Interface/Icons/StoreIcons/Warframes/Excalibur.png" },
+  { cat: "weapon", name: "Weapon", sub: T.tileWeaponDesc, icon: "/Lotus/Interface/Icons/StoreIcons/Weapons/MeleeWeapons/Weapons/Nikana.png" },
+  { cat: "upgrade", name: T.modsArcanes, sub: T.tileModDesc, icon: "/Lotus/Interface/Cards/Images/AvatarMods/AbilityDurationMod.png" },
+  { href: "#/eye", name: T.sentientBuilder, sub: T.tileSentientDesc, icon: "/Lotus/Interface/Graphics/AntiqueMods/SentientBackFrame.png" },
 ];
 
 function initHome() {
@@ -307,13 +307,13 @@ function initHome() {
 }
 const MOD_FLAGS = {
   impostor: {
-    label: "Impostor",
-    text: "Exists in the game files but can't be officially obtained in game.",
+    label: T.impostor,
+    text: T.impostorDesc,
     svg: '<svg viewBox="0 0 32 32" width="16" height="16" aria-hidden="true" stroke="#0b0b0b" stroke-width="1.4" stroke-linejoin="round"><rect x="4.3" y="11.5" width="5.4" height="12" rx="2.6" fill="#e2312b"/><path d="M8.6 11.2C8.6 6 11.6 3.2 16.4 3.2c4.9 0 8.2 2.4 8.2 6.8V23c0 2.4-.8 4.6-1.6 5.6h-4.2v-3.9c-1-.5-2.9-.5-3.9 0v3.9h-4.1c-.9-.9-1.5-3-1.6-5.4Z" fill="#e2312b"/><rect x="14.6" y="7.4" width="12.6" height="7.4" rx="3.7" fill="#b9c0c8"/></svg>',
   },
   flawed: {
-    label: "Flawed",
-    text: "Get yours from Iron Wake! Or... Use WebUI.",
+    label: T.flawed,
+    text: T.flawedDesc,
     svg: `<img src="${IMG}/Lotus/Interface/Icons/Antivirus/Broken.png" width="20" height="20" alt="" loading="lazy">`,
   },
 };
@@ -341,10 +341,10 @@ const pick = { cat: null, sub: null, items: [], shown: 0, filtered: [], multi: f
 function drawChosen() {
   const n = pick.chosen.size;
   $("#multi-bar").hidden = !pick.multi;
-  $("#multi-count").textContent = n ? `${n} selected` : "Click items to select them";
+  $("#multi-count").textContent = n ? `${n} selected` : T.selectHint;
   $("#multi-open").disabled = n < 2;
   $("#btn-multi").classList.toggle("on", pick.multi);
-  $("#btn-multi").textContent = pick.multi ? "Cancel selection" : "Select multiple";
+  $("#btn-multi").textContent = pick.multi ? T.cancelSelection : T.selectMultiple;
 }
 
 function initMulti() {
@@ -377,7 +377,7 @@ async function showPicker(cat) {
     pick.sub = null;
     $("#grid").replaceChildren();
     $("#subcats").replaceChildren();
-    $("#pick-status").innerHTML = '<span class="spinner"></span>Loading items…';
+    $("#pick-status").innerHTML = '<span class="spinner"></span>' + T.loadingItems;
     try {
       pick.items = await loadList(cat);
     } catch (e) {
@@ -387,10 +387,10 @@ async function showPicker(cat) {
     }
     if (pick.cat !== cat) return;
     const subs = [...new Set(pick.items.map((i) => i.sub))];
-    const order = Object.values(CATS[cat].sub).concat(["Mods", "Arcanes", "Other"]);
+    const order = Object.values(CATS[cat].sub).concat([T.mods, T.arcanes, T.other]);
     subs.sort((a, b) => order.indexOf(a) - order.indexOf(b));
     $("#subcats").replaceChildren(
-      h("button", { class: "on", onclick: () => setSub(null) }, "All"),
+      h("button", { class: "on", onclick: () => setSub(null) }, T.all),
       ...subs.map((s) => h("button", { "data-sub": s, onclick: () => setSub(s) }, s)),
     );
   }
@@ -808,13 +808,13 @@ const saveDraft = debounce(() => {
   const key = "draft:" + (ed.multi ? "multi:" + ed.paths.join("|") : (ed.eye ? "eye:" + ed.eye.mode + ":" : "") + ed.path);
   if (!ed.eye && !ed.ops.length && !ed.text.length && !$("#cond-on").checked && ed.name === ed.defaultName) { store.del(key); return; }
   const saved = store.set(key, { eye: ed.eye && { store: ed.eye.store, manifest: ed.eye.manifest }, name: ed.name, ops: ed.ops, text: ed.text, actions: ed.actions, nextAction: ed.nextAction, cond: [$("#cond-on").checked, $("#cond-mode").value, $("#cond-ver").value] });
-  if (!saved && !draftWarned) { draftWarned = true; toast("Browser storage is full, so this draft was not saved"); }
+  if (!saved && !draftWarned) { draftWarned = true; toast(T.storageFull); }
 }, 400);
 
 function drawSharedWarn() {
   const names = ed.sharedParents.map(tail), one = names.length === 1;
   $("#shared-warn").hidden = !ed.multi || !names.length;
-  $("#shared-warn").textContent = `All ${names.join(" and ")} edits also affect ${one ? "variants that inherit from it" : "variants that inherit from them"}.`;
+  $("#shared-warn").textContent = one ? fmt(T.sharedOne, names[0]) : fmt(T.sharedMany, names.join(T.and));
 }
 function renderOutput() {
   if (!ed?.sides) return;
@@ -911,7 +911,7 @@ function leafWidget(sn, path, v, n) {
     renderOutput();
   };
   if (spec?.t === "bool" && (v === 0 || v === 1)) {
-    const sel = h("select", { class: "input mini" }, h("option", { value: "1", selected: v === 1 }, "Yes"), h("option", { value: "0", selected: v === 0 }, "No"));
+    const sel = h("select", { class: "input mini" }, h("option", { value: "1", selected: v === 1 }, T.yes), h("option", { value: "0", selected: v === 0 }, T.no));
     sel.addEventListener("change", () => set(+sel.value));
     return sel;
   }
@@ -960,7 +960,7 @@ function leafWidget(sn, path, v, n) {
     if (!stat) return inp;
     const wrap = h("span", { class: "w stat" }, inp);
     if (stat.additive && stat.max != null) {
-      maxIn = h("input", { class: "input mini", type: "text", inputMode: "decimal", value: fmtNum(statAt(v, stat, stat.max)), title: "In-game value at max rank" });
+      maxIn = h("input", { class: "input mini", type: "text", inputMode: "decimal", value: fmtNum(statAt(v, stat, stat.max)), title: T.maxRankHint });
       maxIn.addEventListener("input", () => {
         const t = Number(maxIn.value.trim());
         if (maxIn.value.trim() === "" || isNaN(t)) return;
@@ -969,7 +969,7 @@ function leafWidget(sn, path, v, n) {
         set(raw);
         show(raw);
       });
-      wrap.append(h("span", { class: "eq" }, "or at max rank", maxIn, stat.pct ? "%" : ""));
+      wrap.append(h("span", { class: "eq" }, T.orMaxRank, maxIn, stat.pct ? "%" : ""));
     }
     wrap.append(game);
     return wrap;
@@ -982,7 +982,7 @@ function leafWidget(sn, path, v, n) {
   }
   inp.addEventListener("input", () => set(shown && typeof orig === "string" && loc(orig) === inp.value ? orig : inp.value));
   if (textField) {
-    inp.placeholder = "Type a new text, or search an existing one";
+    inp.placeholder = T.textFieldHint;
     return h("span", { class: "w loc-w" }, inp, locSearch(inp, (k) => { inp.value = loc(k); set(k); }, /Desc/i.test(key || "") ? 200 : 40));
   }
   return inp;
@@ -1002,15 +1002,15 @@ function statText(v, st) {
     if (!st.additive) return "×" + fmtNum(v);
     return (x >= 0 ? "+" : "") + fmtNum(x) + (st.pct ? "%" : "");
   };
-  if (!st.additive) return `In game: ${/^SET/.test(st.op) ? fmtNum(v) : f(0)} (${enumLabel(st.op).toLowerCase()})`;
-  return st.max != null ? `In game: ${f(0)} at rank 0, ${f(st.max)} at rank ${st.max} (max)` : `In game: ${f(0)} per rank`;
+  if (!st.additive) return fmt(T.gameOp, /^SET/.test(st.op) ? fmtNum(v) : f(0), enumLabel(st.op).toLowerCase());
+  return st.max != null ? fmt(T.gameRankRange, f(0), f(st.max), st.max) : fmt(T.gamePerRank, f(0));
 }
 
 const GENERAL_STATS = new Set(["WEAPON_MELEE_HEAVY_CHARGE_SPEED","WEAPON_DAMAGE_IF_VICTIM_PROC_ACTIVE","WEAPON_INIT_DAMAGE_MOD","WEAPON_PARRY_COUNTER_CHANCE_STAGGER"]);
 const isSpecialStat = (t) => !GENERAL_STATS.has(t) && statName(t).split(" ").length >= 5;
 function statSelect(vals, v) {
   const groups = new Map(STAT_GROUPS.map(([g]) => [g, []]));
-  for (const x of vals.filter((y) => statName(y) || y === v)) groups.get(isSpecialStat(x) ? "Special effects" : STAT_GROUPS.find(([, re]) => re.test(x))[0]).push(x);
+  for (const x of vals.filter((y) => statName(y) || y === v)) groups.get(isSpecialStat(x) ? T.specialEffects : STAT_GROUPS.find(([, re]) => re.test(x))[0]).push(x);
   return h("select", { class: "input mini" }, [...groups].filter(([, xs]) => xs.length).map(([g, xs]) =>
     h("optgroup", { label: g }, xs.sort((a, b) => statName(a).localeCompare(statName(b))).map((x) => h("option", { value: x, selected: x === v }, statName(x))))));
 }
@@ -1034,9 +1034,9 @@ function node(sn, path, v, flt = treeFilter) {
   const n = h("div", { class: "node" + (changed ? " mod" : "") + (top ? " top" : "") });
   const inherited = top && exists && !s.ownKeys.includes(k);
   const acts = h("span", { class: "acts" },
-    inArr && isObj(v) ? h("button", { class: "btn-x", title: "Duplicate", onclick: () => { record(sn, { t: "dup", path }); refresh(); } }, "⧉") : null,
+    inArr && isObj(v) ? h("button", { class: "btn-x", title: T.duplicate, onclick: () => { record(sn, { t: "dup", path }); refresh(); } }, "⧉") : null,
     inherited && !isObj(v) ? null : h("button", {
-      class: "btn-x", title: inherited ? "Empty this inherited value" : inArr ? "Remove item" : "Remove",
+      class: "btn-x", title: inherited ? T.emptyInherited : inArr ? T.removeItem : T.remove,
       onclick: () => {
         if (top && !exists) resetKey(sn, k);
         else if (inherited) { record(sn, { t: "set", path, v: Array.isArray(v) ? [] : {} }); refresh(); }
@@ -1058,7 +1058,7 @@ function node(sn, path, v, flt = treeFilter) {
     n.append(h("div", { class: "line" },
       h("button", { class: "tw", onclick: toggle }, open ? "▾" : "▸"),
       Object.assign(label, { onclick: toggle, className: "k click" }),
-      h("span", { class: "sum", onclick: toggle }, v.UpgradeType ? "" : count + (arr ? (count === 1 ? " item" : " items") : count === 1 ? " field" : " fields")),
+      h("span", { class: "sum", onclick: toggle }, v.UpgradeType ? "" : arr ? (count === 1 ? T.oneItem : fmt(T.countItems, count)) : count === 1 ? T.oneField : fmt(T.countFields, count)),
       acts));
     if (open) {
       const changedAt = (kk) => { const p = [...path, kk]; return !hasAt(s.base, p) || !deepEq(getAt(s.base, p), getAt(s.edit, p)); };
@@ -1066,8 +1066,8 @@ function node(sn, path, v, flt = treeFilter) {
       const entries = Object.entries(v).filter(show).filter(([kk]) => !changedOnly || changedAt(kk));
       const extra = changedOnly ? 0 : entries.filter(quiet).length, full = ed.full.has(id);
       const kids = h("div", { class: "kids" }, entries.filter((e) => full || changedOnly || !quiet(e)).map(([kk, x]) => node(sn, [...path, kk], x, sub)));
-      if (extra) kids.append(h("button", { class: "more-fields", type: "button", onclick: () => { full ? ed.full.delete(id) : ed.full.add(id); n.replaceWith(node(sn, path, getAt(s.edit, path), flt)); } }, full ? "Hide empty fields" : "Show " + extra + (extra === 1 ? " more field" : " more fields")));
-      if (arr) kids.append(h("button", { class: "btn btn-ghost add-item", onclick: () => { record(sn, { t: "push", path, v: newItem(sn, path, v) }); refresh(); } }, "+ Add item"));
+      if (extra) kids.append(h("button", { class: "more-fields", type: "button", onclick: () => { full ? ed.full.delete(id) : ed.full.add(id); n.replaceWith(node(sn, path, getAt(s.edit, path), flt)); } }, full ? T.hideEmptyFields : (extra === 1 ? T.showOneField : fmt(T.showFields, extra))));
+      if (arr) kids.append(h("button", { class: "btn btn-ghost add-item", onclick: () => { record(sn, { t: "push", path, v: newItem(sn, path, v) }); refresh(); } }, T.addItem));
       n.append(kids);
     }
     return n;
@@ -1083,7 +1083,7 @@ function restoreAt(sn, path) {
   record(sn, hasAt(base, path) ? { t: "set", path, v: clone(getAt(base, path)) } : { t: "del", path });
   refresh();
 }
-const restoreDot = (sn, path) => h("button", { class: "dot-btn", type: "button", title: "Restore the original value", onclick: (e) => { e.stopPropagation(); restoreAt(sn, path); } });
+const restoreDot = (sn, path) => h("button", { class: "dot-btn", type: "button", title: T.restoreValue, onclick: (e) => { e.stopPropagation(); restoreAt(sn, path); } });
 function keyLabel(path, k, inArr, v, dot) {
   const el = h("span", { class: "k", title: path.join(".") }, dot);
   if (inArr) {
@@ -1139,13 +1139,13 @@ function renderSide(sn) {
   const removedInh = Object.keys(s.base).filter((k) => !s.ownKeys.includes(k) && !(k in s.edit) && !HIDDEN(k));
   const removedRow = (k) => h("div", { class: "node top removed" }, h("div", { class: "line" },
     h("span", { class: "tw" }), h("span", { class: "k" }, labelOf(k)), h("span", { class: "sum" }, "removed"),
-    h("span", { class: "acts" }, h("button", { class: "btn-x", title: "Restore", onclick: () => resetKey(sn, k) }, "↺︎"))));
+    h("span", { class: "acts" }, h("button", { class: "btn-x", title: T.restore, onclick: () => resetKey(sn, k) }, "↺︎"))));
   const addWrap = h("div", { class: "add-wrap" });
-  addWrap.append(h("button", { class: "btn", onclick: (e) => { e.stopPropagation(); openAddMenu(sn, addWrap); } }, "+ Add field"));
+  addWrap.append(h("button", { class: "btn", onclick: (e) => { e.stopPropagation(); openAddMenu(sn, addWrap); } }, T.addField));
   return h("div", { class: "sec", "data-side": sn },
     h("div", { class: "sec-head" },
-      h("div", {}, h("div", { class: "sec-title" }, sn === "all" ? `Shared metadata of ${realSides().length} items` : sn === "item" ? "Item" : "Store item"),
-        sn === "all" ? h("div", { class: "muted small" }, "Only values that are identical in every item are shown. Changes apply to all of them, and to their store items wherever the same value exists.") : sn === "store" ? h("code", { class: "muted small" }, s.path) : null),
+      h("div", {}, h("div", { class: "sec-title" }, sn === "all" ? fmt(T.sharedMetadata, realSides().length) : sn === "item" ? T.item : T.storeItem),
+        sn === "all" ? h("div", { class: "muted small" }, T.sharedMetadataHint) : sn === "store" ? h("code", { class: "muted small" }, s.path) : null),
       addWrap),
     h("div", { class: "tree" },
       own.filter(match).map((k) => node(sn, [k], s.edit[k])),
@@ -1157,30 +1157,30 @@ function renderSide(sn) {
       const shown = ks.filter(match);
       if ((filter || changedOnly) && !shown.length && !gone.length) return null;
       return h("details", { class: "inh", open: filter || changedOnly ? true : ed.inhOpen.has(gid), ontoggle: (e) => { if (!filter && !changedOnly) e.target.open ? ed.inhOpen.add(gid) : ed.inhOpen.delete(gid); } },
-        h("summary", {}, h("span", {}, `${ed.eye?.mode === "new" ? "Copied" : "Inherited"} from ${tail(src || "parent type")} (${ks.length})`), isBaseType(src) ? warnTip(`You also need to edit this parent type (${tail(src)}) for some changes to take effect.`) : null),
+        h("summary", {}, h("span", {}, `${ed.eye?.mode === "new" ? "Copied" : "Inherited"} from ${tail(src || "parent type")} (${ks.length})`), isBaseType(src) ? warnTip(fmt(T.parentEditHint, tail(src))) : null),
         h("div", { class: "tree" }, shown.map((k) => node(sn, [k], s.edit[k])), gone.map(removedRow)));
     }),
-    !keys.length && !removed.length ? h("div", { class: "empty" }, "No metadata found for this type.") : null,
-    changedOnly && keys.length && !keys.some(match) && !removed.length && !removedInh.length ? h("div", { class: "empty" }, "No changes yet.") : null);
+    !keys.length && !removed.length ? h("div", { class: "empty" }, T.noMetadataFound) : null,
+    changedOnly && keys.length && !keys.some(match) && !removed.length && !removedInh.length ? h("div", { class: "empty" }, T.noChangesYet) : null);
 }
 const BASIC_GROUPS = new Set(["mod", "arcane", "suit", "weapon"]);
 const isAdvanced = () => !!store.get("advancedEditor");
 const useBasic = () => !isAdvanced() && BASIC_GROUPS.has(ed.group);
 const findKey = (obj, prefix) => (isObj(obj) ? Object.keys(obj).find((k) => k.startsWith(prefix) && isObj(obj[k])) : undefined);
 function basicLayout(e) {
-  const general = [["Name", ["LocalizeTag"]], ["Description", ["LocalizeDescTag"]], ["Icon", ["Icon"]]];
-  const slots = () => Array.isArray(e.ArtifactSlots) && groups.push(["Polarity slots", e.ArtifactSlots.map((_, i) => ["Slot " + (i + 1), ["ArtifactSlots", String(i)]])]);
+  const general = [[T.name, ["LocalizeTag"]], [T.description, ["LocalizeDescTag"]], ["Icon", ["Icon"]]];
+  const slots = () => Array.isArray(e.ArtifactSlots) && groups.push([T.polaritySlots, e.ArtifactSlots.map((_, i) => [fmt(T.slotN, i + 1), ["ArtifactSlots", String(i)]])]);
   const clean = (list) => list.filter(Boolean);
   const groups = [];
   if (ed.group === "suit") {
-    general.push(["Passive description", ["PassiveAbilityLocTag"]], ["Health", ["MaxHealthOverride"]], ["Shields", ["MaxShieldOverride"]], ["Armor", ["ArmourRatingOverride"]], ["Max energy", ["MaxEnergy"]], ["Starting energy", ["InitialEnergy"]], ["Sprint speed", ["MovementSpeedMultiplier"]]);
+    general.push([T.passiveDescription, ["PassiveAbilityLocTag"]], [T.health, ["MaxHealthOverride"]], [T.shields, ["MaxShieldOverride"]], [T.armor, ["ArmourRatingOverride"]], [T.maxEnergy, ["MaxEnergy"]], [T.startingEnergy, ["InitialEnergy"]], [T.sprintSpeed, ["MovementSpeedMultiplier"]]);
     slots();
-    if (Array.isArray(e.AbilityTypes)) groups.push(["Abilities", e.AbilityTypes.map((_, i) => ["Ability " + (i + 1), ["AbilityTypes", String(i)]])]);
+    if (Array.isArray(e.AbilityTypes)) groups.push([T.abilities, e.AbilityTypes.map((_, i) => [fmt(T.abilityN, i + 1), ["AbilityTypes", String(i)]])]);
   } else if (ed.group === "weapon") {
     const gun = Number(e.AmmoClipSize) > 0;
-    general.push(gun && ["Magazine size", ["AmmoClipSize"]], ["Mastery requirement", ["RequiredLevel"]]);
+    general.push(gun && [T.magazineSize, ["AmmoClipSize"]], [T.masteryRequirement, ["RequiredLevel"]]);
     const modes = (Array.isArray(e.Behaviors) ? e.Behaviors : []).slice(0, e.AlternateFireDisabled ? 1 : undefined);
-    const STATS = [["Damage", "impact:", ["AttackData", "Amount"]], ["Status chance (1 = 100%)", "impact:", ["AttackData", "ProcChance"]], ["Critical chance (1 = 100%)", "impact:", ["criticalHitChance"]], ["Critical multiplier", "impact:", ["criticalHitDamageMultiplier"]], ["Multishot", "fire:", ["fireIterations"]], [gun ? "Fire rate" : "Attack speed", "state:", ["fireRate"]], ["Reload time (s)", "state:", ["reloadTime"]]];
+    const STATS = [[T.damage, "impact:", ["AttackData", T.amount]], [T.statusChanceFraction, "impact:", ["AttackData", "ProcChance"]], [T.critChanceFraction, "impact:", ["criticalHitChance"]], [T.criticalMultiplier, "impact:", ["criticalHitDamageMultiplier"]], [T.multishot, "fire:", ["fireIterations"]], [gun ? T.fireRate : T.attackSpeed, "state:", ["fireRate"]], [T.reloadTime, "state:", ["reloadTime"]]];
     const shared = [], per = modes.map(() => []);
     for (const [label, prefix, rest] of STATS.filter(([l]) => gun || !/^(Multishot|Reload)/.test(l))) {
       const paths = modes.map((b, i) => { const k = findKey(b, prefix); return k && hasAt(b[k], rest) ? ["Behaviors", String(i), k, ...rest] : null; });
@@ -1189,11 +1189,11 @@ function basicLayout(e) {
       if (found.every((p) => getAt(e, p) === getAt(e, found[0]))) shared.push([label, found[0], found.slice(1)]);
       else paths.forEach((p, i) => p && per[i].push([label, p]));
     }
-    if (shared.length) groups.push(["Stats", shared]);
+    if (shared.length) groups.push([T.stats, shared]);
     slots();
-    per.forEach((rows, i) => rows.length && groups.push([i === 0 ? "Main attack" : i === 1 ? "Alternate fire" : "Attack " + (i + 1), rows]));
+    per.forEach((rows, i) => rows.length && groups.push([i === 0 ? T.mainAttack : i === 1 ? T.alternateFire : fmt(T.attackN, i + 1), rows]));
   }
-  return [["General", clean(general)], ...groups];
+  return [[T.general, clean(general)], ...groups];
 }
 const renderBasic = (sn) => (ed.group === "mod" || ed.group === "arcane" ? renderActions(sn) : renderItemActions(sn));
 const syncSide = debounce((sn) => {
@@ -1209,7 +1209,7 @@ function renderSides() {
   $("#adv-toggle").closest("label").hidden = !BASIC_GROUPS.has(ed.group);
   if (basic) {
     const rules = ed.text.length;
-    $("#sides").replaceChildren(rules ? h("p", { class: "muted small basic-note" }, rules + (rules === 1 ? " find and replace rule" : " find and replace rules") + " from the Advanced editor still apply.") : "", renderBasic(ed.multi ? "all" : "item"));
+    $("#sides").replaceChildren(rules ? h("p", { class: "muted small basic-note" }, rules === 1 ? T.oneRule : fmt(T.countRules, rules)) : "", renderBasic(ed.multi ? "all" : "item"));
     focusActionForm();
     return;
   }
@@ -1219,7 +1219,7 @@ function renderSides() {
 function renderFr() {
   $("#fr-list").replaceChildren(...ed.text.map((op, i) => h("div", { class: "chip" },
     h("code", {}, `${op.kind}|${op.from}|${op.to}`),
-    h("button", { class: "btn-x", title: "Remove", onclick: () => { ed.text.splice(i, 1); replayAll(); refresh(); } }, "×"))));
+    h("button", { class: "btn-x", title: T.remove, onclick: () => { ed.text.splice(i, 1); replayAll(); refresh(); } }, "×"))));
   if (ed.text.length) $("#fr").hidden = false;
 }
 let addSide = "item";
@@ -1232,7 +1232,7 @@ function addOptions() {
   const common = (addSide === "store" ? [] : COMMON[ed.group] || []).filter((k) => k in fields && missing(k));
   const known = Object.keys(fields).filter((k) => missing(k) && !common.includes(k) && !HIDDEN(k));
   const set = Object.keys(s.edit).filter((k) => !HIDDEN(k));
-  return [["Common", common], ["Known fields", known.sort((a, b) => labelOf(a).localeCompare(labelOf(b)))], ["Already set", set]];
+  return [["Common", common], [T.knownFields, known.sort((a, b) => labelOf(a).localeCompare(labelOf(b)))], [T.alreadySet, set]];
 }
 function drawAddMenu() {
   const q = addSearch.value.trim();
@@ -1240,16 +1240,16 @@ function drawAddMenu() {
   addList.replaceChildren();
   let n = 0, exact = false;
   for (const [grp, keys] of addOptions()) {
-    const isSet = grp === "Already set";
+    const isSet = grp === T.alreadySet;
     if (isSet && !ql) continue;
     const f = keys.filter((k) => !ql || (labelOf(k) + " " + k).toLowerCase().includes(ql));
     if (!f.length) continue;
     if (f.some((k) => k.toLowerCase() === ql || labelOf(k).toLowerCase() === ql)) exact = true;
     addList.append(h("div", { class: "grp" }, grp));
-    for (const k of f.slice(0, 400)) addList.append(h("button", { class: n++ === 0 ? "sel" : "", onclick: () => (isSet ? jumpToField(k) : pickField(k)) }, h("span", {}, labelOf(k)), isSet ? h("span", {}, "go to field") : null));
+    for (const k of f.slice(0, 400)) addList.append(h("button", { class: n++ === 0 ? "sel" : "", onclick: () => (isSet ? jumpToField(k) : pickField(k)) }, h("span", {}, labelOf(k)), isSet ? h("span", {}, T.goToField) : null));
   }
   if (q && !exact && /^[A-Za-z_][\w:]*$/.test(q)) {
-    addList.append(h("div", { class: "grp" }, "Custom"), h("button", { class: n ? "" : "sel", onclick: () => pickField(q) }, h("span", {}, labelOf(q)), h("span", {}, "new field")));
+    addList.append(h("div", { class: "grp" }, T.custom), h("button", { class: n ? "" : "sel", onclick: () => pickField(q) }, h("span", {}, labelOf(q)), h("span", {}, T.newField)));
   }
 }
 
@@ -1311,10 +1311,10 @@ function restoreDraft(draft) {
   ed.actions = draft.actions || [];
   ed.nextAction = draft.nextAction || 0;
   restoreCond(draft.cond);
-  if (ed.ops.length || ed.text.length) toast("Restored your earlier edits");
+  if (ed.ops.length || ed.text.length) toast(T.draftRestored);
 }
 async function showEditor(cat, path, eye = null) {
-  resetEditor({ cat, path, eye, group: fieldGroup(cat, eye?.base || path) }, "Loading metadata…");
+  resetEditor({ cat, path, eye, group: fieldGroup(cat, eye?.base || path) }, T.loadingMetadata);
   const mine = ed;
   $("#target-path").textContent = path;
   $("#target-name").textContent = tail(path);
@@ -1355,12 +1355,10 @@ async function showEditor(cat, path, eye = null) {
   const icon = ed.entry?.icon || ed.sides.item.eff.Icon;
   if (icon) setIcon($("#target-icon"), icon);
   const base = eye ? null : (item?.parents || []).find(isBaseType);
-  $("#parent-warn").replaceChildren(...(base ? [
-    "Some changes require the parent type (", h("a", { href: "#/edit?c=" + cat + "&p=" + encodeURIComponent(base) }, tail(base)), ") to be edited. All " + tail(base) + " edits also affect " + (ed.group === "suit" ? "its Prime variant." : "variants that inherit from it."),
-  ] : []));
+  $("#parent-warn").replaceChildren(...(base ? fmtNodes(ed.group === "suit" ? T.parentWarnSuit : T.parentWarn, h("a", { href: "#/edit?c=" + cat + "&p=" + encodeURIComponent(base) }, tail(base)), tail(base)) : []));
   $("#parent-warn").hidden = !base;
-  if (!item) toast("No metadata found for this path");
-  if (eye?.mode === "new") $("#target-path").textContent = path + "  (new, based on " + src + ")";
+  if (!item) toast(T.noMetadataPath);
+  if (eye?.mode === "new") $("#target-path").textContent = fmt(T.copyPath, path, src);
 
   ed.defaultName = name;
   ed.name = draft?.name ?? name;
@@ -1390,7 +1388,7 @@ function loadCustoms() {
 
 function eyeField(label, value, onInput, opts = {}) {
   const input = opts.options
-    ? h("select", { class: "input mini" }, opts.options.map((o) => h("option", { value: o, selected: o === value }, o || "(none)")))
+    ? h("select", { class: "input mini" }, opts.options.map((o) => h("option", { value: o, selected: o === value }, o || T.none)))
     : h("input", { class: "input mini", value, spellcheck: "false", autocomplete: "off", placeholder: opts.placeholder || "" });
   input.addEventListener(opts.options ? "change" : "input", () => { onInput(input.value); renderOutput(); });
   return h("label", { class: "eye-field" }, h("span", { class: "label" }, label), input);
@@ -1404,25 +1402,25 @@ function drawEyePanel() {
   el.hidden = false;
   const cats = [...new Set(["", st.category, ...(FIELDS.store?.ProductCategory?.enum || [])])];
   const isNew = e.mode === "new";
-  const same = (what) => (isNew ? "Same as the item " + what : "Plain text or a game text key");
-  el.replaceChildren(
-    isNew ? h("p", { class: "muted small" }, "Only ", h("code", {}, tail(ed.path)), " is created and edited. ", h("code", {}, tail(e.base)), " stays as it is.") : null,
+  const same = (what) => (isNew ? fmt(T.sameAsItem, what) : T.textKeyHint);
+  el.replaceChildren(...[
+    isNew ? h("p", { class: "muted small" }, fmtNodes(T.copyNote, h("code", {}, tail(ed.path)), h("code", {}, tail(e.base)))) : null,
     e.hasStore
-      ? h("p", { class: "muted small" }, "This item already has a store item, so only the store entry is added.")
-      : h("details", { class: "eye-more" }, h("summary", {}, "Store item settings"),
+      ? h("p", { class: "muted small" }, T.hasStoreItem)
+      : h("details", { class: "eye-more" }, h("summary", {}, T.storeItemSettings),
           h("div", { class: "eye-grid" },
-            eyeField("Store item path", st.path, (v) => (st.path = v.trim())),
-            eyeField("Parent store item type", st.parent, (v) => (st.parent = v.trim())),
-            st.parent.startsWith("/Lotus/StoreItems/") ? h("span", { class: "muted small eye-note" }, "Category is inherited from the parent store item.") : eyeField("Category", st.category, (v) => (st.category = v), { options: cats }),
-            eyeField("Store name", st.name, (v) => (st.name = v), { placeholder: same("name") }),
-            eyeField("Store description", st.desc, (v) => (st.desc = v), { placeholder: same("description") }),
-            eyeField("Store icon", st.icon, (v) => (st.icon = v), { placeholder: "/Lotus/Interface/Icons/…" }))),
-    h("label", { class: "check" }, Object.assign(h("input", { type: "checkbox", checked: e.manifest }), { onchange: (ev) => { e.manifest = ev.target.checked; renderOutput(); } }), h("span", {}, "Add it to the in-game store")));
+            eyeField(T.storeItemPath, st.path, (v) => (st.path = v.trim())),
+            eyeField(T.storeParent, st.parent, (v) => (st.parent = v.trim())),
+            st.parent.startsWith("/Lotus/StoreItems/") ? h("span", { class: "muted small eye-note" }, T.storeCategoryInherited) : eyeField(T.category, st.category, (v) => (st.category = v), { options: cats }),
+            eyeField(T.storeName, st.name, (v) => (st.name = v), { placeholder: same("name") }),
+            eyeField(T.storeDescription, st.desc, (v) => (st.desc = v), { placeholder: same("description") }),
+            eyeField(T.storeIcon, st.icon, (v) => (st.icon = v), { placeholder: "/Lotus/Interface/Icons/…" }))),
+    h("label", { class: "check" }, Object.assign(h("input", { type: "checkbox", checked: e.manifest }), { onchange: (ev) => { e.manifest = ev.target.checked; renderOutput(); } }), h("span", {}, T.addToMarket))].filter(Boolean));
 }
 async function showMulti(cat, paths) {
-  resetEditor({ cat, path: paths[0], paths, multi: true, group: fieldGroup(cat, paths[0]) }, "Loading metadata for " + paths.length + " items…");
+  resetEditor({ cat, path: paths[0], paths, multi: true, group: fieldGroup(cat, paths[0]) }, fmt(T.loadingItems, paths.length));
   $("#target-icon").style.visibility = "hidden";
-  $("#target-name").textContent = paths.length + " items";
+  $("#target-name").textContent = fmt(T.countItems, paths.length);
   $("#target-path").textContent = paths.join("  &  ");
   const draft = store.get("draft:multi:" + paths.join("|"));
   let types, stores;
@@ -1436,7 +1434,7 @@ async function showMulti(cat, paths) {
   }
   if (!ed || ed.paths !== paths) return;
   const missing = paths.filter((_, i) => !types[i]);
-  if (missing.length) toast("Not found in the game data: " + missing.map(tail).join(", "));
+  if (missing.length) toast(fmt(T.notFoundList, missing.map(tail).join(", ")));
   ed.sides = {};
   paths.forEach((p, i) => {
     ed.sides["m" + i] = makeSide(p, types[i]);
@@ -1481,10 +1479,10 @@ function initEditor() {
     }
   });
   $("#patch-name").addEventListener("input", (e) => { ed.name = e.target.value; renderOutput(); });
-  loadBuilds().then((list) => $("#cond-ver-list").append(...list.map(([v, l]) => h("option", { value: v }, l)))).catch(() => {});
+  pathSearch($("#cond-ver"), () => loadBuilds().then((list) => list.map(([v, l]) => ({ name: v, shown: l, path: v }))).catch(() => []));
   $("#cond-mode").addEventListener("change", () => { syncCond(); renderOutput(); });
   $("#cond-on").addEventListener("change", () => { syncCond(); renderOutput(); });
-  $("#cond-ver").addEventListener("input", () => { syncCond(); renderOutput(); });
+  for (const type of ["input", "change"]) $("#cond-ver").addEventListener(type, () => { syncCond(); renderOutput(); });
   $("#key-filter").addEventListener("input", debounce(() => { if (!ed?.sides) return; ed.closed.clear(); renderSides(); }, 120));
   $("#adv-toggle").addEventListener("change", (e) => { store.set("advancedEditor", e.target.checked); if (ed?.sides) renderSides(); });
   $("#changed-only").addEventListener("change", (e) => { changedOnly = e.target.checked; if (ed?.sides) { ed.closed.clear(); renderSides(); } });
@@ -1495,15 +1493,15 @@ function initEditor() {
     const from = $("#fr-from").value, to = $("#fr-to").value;
     if (!from || !ed?.sides) return;
     const kind = $("#fr-regex").checked ? "s" : "r";
-    if (kind === "r" && from.includes("|")) { toast("The search text cannot contain |"); return; }
-    if (kind === "s") { try { new RegExp(from); } catch { toast("Invalid regex"); return; } }
+    if (kind === "r" && from.includes("|")) { toast(T.searchNoPipe); return; }
+    if (kind === "s") { try { new RegExp(from); } catch { toast(T.invalidRegex); return; } }
     ed.text.push({ kind, from, to });
     $("#fr-from").value = $("#fr-to").value = "";
     replayAll();
     refresh();
   };
   $("#btn-reset").onclick = () => {
-    if (!ed?.sides || !confirm("Reset every change to this item? This can't be undone.")) return;
+    if (!ed?.sides || !confirm(T.resetConfirm)) return;
     ed.ops = [];
     ed.text = [];
     ed.actions = [];
@@ -1513,7 +1511,7 @@ function initEditor() {
     refresh();
   };
   $("#btn-copy").onclick = () => copyText(buildPatch());
-  $("#btn-save").onclick = () => { if (ed?.sides) saveText(ed.name || tail(ed.path), buildPatch(), "Untitled"); };
+  $("#btn-save").onclick = () => { if (ed?.sides) saveText(ed.name || tail(ed.path), buildPatch(), T.untitled); };
 }
 function namePaths(items, byName) {
   const count = new Map();
@@ -1534,11 +1532,86 @@ function pathSearch(input, load) {
     data ||= await load();
     const hits = q.length < 2 ? [] : data.map((i) => {
       const n = i.name.toLowerCase(), at = n.indexOf(q);
-      const rank = n === q ? 0 : at === 0 ? 1 : at > 0 ? 2 : i.path.toLowerCase().includes(q) ? 3 : -1;
+      const rank = n === q ? 0 : at === 0 ? 1 : at > 0 ? 2 : (i.path + " " + (i.shown || "")).toLowerCase().includes(q) ? 3 : -1;
       return [rank, i];
     }).filter(([r]) => r >= 0).sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length).slice(0, 12);
     list.show(hits.map(([, i]) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); choose(i); } }, h("span", { class: "pn" }, i.shown || i.name, i.flag ? flagIcon(i.flag) : null), h("span", { class: "pp" }, i.path.replace(/^\/Lotus\//, "")))));
   }, 120));
+}
+async function avatarSuitPath(t, path) {
+  const inv = t.data.InventoryControllerType;
+  if (typeof inv !== "string") return null;
+  const it = await loadType(relTo(t.origin.InventoryControllerType || path, inv));
+  const list = (it?.data.DefaultInv || []).map((x) => relTo(it.origin.DefaultInv, x));
+  return list.find((x) => x.startsWith("/Lotus/Powersuits/")) || null;
+}
+const POWER_SUIT_STORE = "/Lotus/Types/Game/StoreItemSpecializations/PowerSuitStoreItem";
+async function avatarLook(t, path, own, target) {
+  const custom = own.data.DefaultCustomization || {}, at = own.origin.DefaultCustomization || target;
+  const item = (slot) => (typeof custom[slot]?.ItemType === "string" ? relTo(at, custom[slot].ItemType) : "");
+  const helmet = item("Helmet");
+  let skin = item("BodySkin");
+  if (!skin && helmet) skin = helmet.replace(/[^/]*$/, "") + tail(target).replace(/Suit$/, "") + T.skin;
+  const st = skin ? await loadType(skin).catch(() => null) : null;
+  if (!st || !t.data.Mesh) return null;
+  const has = new Set((st.data.THIRD_PERSON_Attachment?.UpgradeAutoChildren || []).map((c) => tail(relTo(skin, c.Type))));
+  const kids = (t.data.AutoSimChildren || []).map((c) => ({ ...c, Type: relTo(t.origin.AutoSimChildren || path, c.Type) })).filter((c) => !isFx(c.Type) && !has.has(tail(c.Type)));
+  const head = kids.filter((c) => /Helmet|Head|Mask/i.test(tail(c.Type)));
+  const over = st.data.UpgradeSkinOverride;
+  return { skin, helmet, mesh: relTo(t.origin.Mesh || path, t.data.Mesh), meshItem: typeof over === "string" ? relTo(st.origin.UpgradeSkinOverride || skin, over) : "", head, body: kids.filter((c) => !head.includes(c)) };
+}
+async function analyzeAvatarSuit(path) {
+  const t = await loadType(path);
+  if (!t) return { error: fmt(T.pathNotFound, path) };
+  const suit = await avatarSuitPath(t, path);
+  if (!suit) return { error: T.noSuit };
+  const st = await loadType(suit);
+  if (!st) return { error: fmt(T.pathNotFound, suit) };
+  const parent = st.parents[0];
+  const target = parent?.startsWith("/Lotus/Powersuits/") && !/BaseSuit$/.test(parent) ? parent : suit;
+  const own = target === suit ? st : await loadType(target);
+  const full = (d, o) => (Array.isArray(d.AbilityTypes) ? d.AbilityTypes : []).map((a) => relTo(o.AbilityTypes || target, a));
+  const abilities = full(st.data, st.origin), wanted = deepEq(abilities, full(own.data, own.origin)) ? [] : abilities;
+  const hasStore = !!(await loadType(toStorePath(target)).catch(() => null));
+  const look = await avatarLook(t, path, own, target);
+  return { kind: "suit", path, target, look, abilities: wanted, abilityCount: abilities.length, hasStore, tag: own.data.LocalizeTag || st.data.LocalizeTag || "", name: stripTags(loc(own.data.LocalizeTag) || loc(st.data.LocalizeTag) || tail(target).replace(/Suit$/, "")), icon: t.data.Icon || "" };
+}
+function drawAvatarSuitForm() {
+  const lookBox = h("input", { type: "checkbox", checked: sk.useLook });
+  lookBox.addEventListener("change", () => { sk.useLook = lookBox.checked; renderSkin(); });
+  const info = sk.info;
+  const text = (key) => {
+    const el = h("input", { class: "input", value: sk[key], spellcheck: "false", autocomplete: "off" });
+    el.addEventListener("input", () => { sk[key] = el.value; renderSkin(); });
+    return el;
+  };
+  $("#skin-form").replaceChildren(...[
+    field(T.name, text("name")), field(T.description, text("desc")),
+    h("p", { class: "muted small" }, info.abilityCount ? fmt(T.suitAdds, info.name, info.abilityCount === 1 ? T.oneAbility : fmt(T.countAbilities, info.abilityCount)) : fmt(T.suitAddsNoAbilities, info.name)),
+    info.look ? h("label", { class: "check" }, lookBox, h("span", {}, T.useLook)) : null].filter(Boolean));
+}
+function buildAvatarSuit() {
+  const info = sk.info, store = toStorePath(info.target), name = sk.name.trim() || info.name, desc = sk.desc.trim();
+  const out = ["# " + name, "$if can_add_new_types()"];
+  if (!info.hasStore) out.push(...skinBlock(`+${store}|${POWER_SUIT_STORE}`, [["ProductCategory", "Suits"], ["LocalizeTag", name], desc && ["LocalizeDescTag", desc], ["TypeName", info.target], ["ShowInMarket", 1], ["RegularPrice", 1]]), "");
+  out.push(">" + MANIFEST, indent("a|StoreItems|" + store), "$endif", "");
+  const texts = [indent("LocalizeTag=" + eeStr(name)), ...(desc ? [indent("LocalizeDescTag=" + eeStr(desc))] : [])];
+  if (info.hasStore) out.push(">" + store, indent("ShowInMarket=1"), indent("RegularPrice=1"), ...texts, "");
+  out.push(">" + info.target, indent("MarketMode=MM_VISIBLE"), ...texts);
+  if (info.abilities.length) out.push(indent("AbilityTypes={" + info.abilities.join(",") + "}"));
+  const look = sk.useLook && info.look;
+  if (look?.meshItem) out.push("", ...skinBlock(">" + look.meshItem, [["TpMeshOverride", look.mesh]]));
+  if (look?.body.length) out.push("", ...skinBlock(">" + look.skin, [["OverrideAttachedFx", 1], ["AttachedFxOverrides", look.body]]));
+  if (look?.helmet && look.head.length) out.push("", ...skinBlock(">" + look.helmet, [["THIRD_PERSON_Attachment", { UpgradeAutoChildren: look.head }]]));
+  return out.join("\n") + "\n";
+}
+async function itemKind(path) {
+  const t = await loadType(path);
+  if (!t) return null;
+  const chain = [path, ...t.parents];
+  const character = chain.includes("/Lotus/Types/Player/TennoAvatar") || /^\/Lotus\/Types\/(Enemies|Friendly|Player)\//.test(path);
+  const weapon = chain.some((p) => p.startsWith("/Lotus/Weapons/") || /LotusWeapon$/.test(p));
+  return { character, suit: character ? await avatarSuitPath(t, path).catch(() => null) : null, skin: weapon ? !!t.data.PickUpMesh : !!t.data.Mesh && !path.startsWith("/Lotus/Upgrades/") };
 }
 function initEye() {
   const input = $("#eye-path"), np = $("#eye-newpath"), status = $("#eye-status");
@@ -1552,27 +1625,57 @@ function initEye() {
   const resolve = () => byName.get(input.value.trim().toLowerCase()) || normalizePath(input.value);
   const suggest = () => {
     const p = resolve();
-    if (mode() === "new" && p && (!np.value || np.dataset.auto === "1")) { np.value = p + "Custom"; np.dataset.auto = "1"; }
+    if (mode() === "new" && p && (!np.value || np.dataset.auto === "1")) { np.value = p + T.custom; np.dataset.auto = "1"; }
   };
   for (const r of document.querySelectorAll('input[name="eye-mode"]')) r.addEventListener("change", () => { $("#eye-new").hidden = mode() !== "new"; suggest(); });
-  input.addEventListener("change", suggest);
+  const radio = (v) => $(`input[name="eye-mode"][value="${v}"]`);
+  const showMode = (v, on) => { radio(v).disabled = !on; radio(v).closest("label").hidden = !on; };
+  let checkId = 0, lastItem = "";
+  const checkItem = async () => {
+    const id = ++checkId, p = resolve();
+    status.textContent = "";
+    let kind = null, failed = false;
+    if (p) { try { kind = await itemKind(p); } catch { failed = true; } }
+    if (id !== checkId) return;
+    $("#eye-choices").hidden = !kind;
+    if (!kind) { if (p && input.value.trim()) status.textContent = failed ? OFFLINE : T.noDataFound; return; }
+    showMode("asis", !kind.character);
+    showMode("new", !kind.character);
+    showMode("suit", !!kind.suit);
+    showMode("skin", kind.skin);
+    $("#eye-note").hidden = !kind.character;
+    $("#eye-note").textContent = kind.suit ? T.avatarNote : T.characterNote;
+    const current = document.querySelector('input[name="eye-mode"]:checked');
+    if (!current || current.disabled || p !== lastItem) {
+      const first = document.querySelector('input[name="eye-mode"]:not(:disabled)');
+      if (first) first.checked = true;
+    }
+    lastItem = p;
+    if (!document.querySelector('input[name="eye-mode"]:not(:disabled)')) { $("#eye-choices").hidden = true; status.textContent = T.notAddable; return; }
+    $("#eye-new").hidden = mode() !== "new";
+    suggest();
+  };
+  input.addEventListener("change", checkItem);
+  input.addEventListener("input", debounce(() => { if (input.value.trim().startsWith("/") || !input.value.trim()) checkItem(); }, 300));
   np.addEventListener("input", () => (np.dataset.auto = ""));
   $("#eye-form").onsubmit = async (e) => {
     e.preventDefault();
     const target = resolve();
     if (!target) return;
-    status.innerHTML = '<span class="spinner"></span>Looking up ' + esc(target) + "…";
+    if ($("#eye-choices").hidden) { checkItem(); return; }
+    status.innerHTML = '<span class="spinner"></span>' + fmt(T.lookingUp, esc(target));
     const lookup = (p) => loadType(p).then((t) => ({ t }), () => { status.textContent = OFFLINE; return null; });
     const found = await lookup(target);
     if (!found) return;
-    if (!found.t) { status.textContent = target + " was not found in the game data."; return; }
+    if (!found.t) { status.textContent = fmt(T.pathNotFound, target); return; }
     if (mode() === "asis") { status.textContent = ""; location.hash = "#/edit?eye=asis&p=" + encodeURIComponent(target); return; }
     if (mode() === "skin") { status.textContent = ""; location.hash = "#/skin?p=" + encodeURIComponent(target); return; }
+    if (mode() === "suit") { status.textContent = ""; location.hash = "#/skin?as=suit&p=" + encodeURIComponent(target); return; }
     const newPath = normalizePath(np.value);
-    if (!newPath || newPath === target) { status.textContent = "Give the new item its own path."; return; }
+    if (!newPath || newPath === target) { status.textContent = T.newItemNeedsPath; return; }
     const taken = await lookup(newPath);
     if (!taken) return;
-    if (taken.t) { status.textContent = newPath + " already exists. Pick another path, or use \"Make it obtainable as it is\"."; return; }
+    if (taken.t) { status.textContent = fmt(T.pathExists, newPath); return; }
     status.textContent = "";
     location.hash = "#/edit?eye=new&base=" + encodeURIComponent(target) + "&p=" + encodeURIComponent(newPath);
   };
@@ -1611,7 +1714,7 @@ function braceDepth(str) {
   return d;
 }
 const ONE_LINE_OBJECT = /\{[^{}]*=[^{}]*\}/;
-const ONE_LINE_MESSAGE = "One-line objects do not work in a new type (+) patch. Put each field on its own line.";
+const ONE_LINE_MESSAGE = T.checkOneLineObject;
 function parsePatchText(text) {
   const diags = [];
   const add = (line, sev, msg) => diags.push({ line, sev, msg });
@@ -1619,7 +1722,7 @@ function parsePatchText(text) {
   let patch = null, amp = false;
   const blocks = [];
   const close = () => {
-    if (patch && patch.depth > 0) add(patch.depthLine, "error", "A { opened here is never closed.");
+    if (patch && patch.depth > 0) add(patch.depthLine, "error", T.checkUnclosedBrace);
   };
   const start = (ln) => {
     close();
@@ -1630,35 +1733,35 @@ function parsePatchText(text) {
     for (const k of str.split("&")) {
       const key = k.trim();
       if (!key) continue;
-      if (!key.startsWith("/")) add(ln, "error", `<code>${esc(key)}</code> is not a valid path. Paths start with /Lotus/.`);
-      else if (/\s/.test(key)) add(ln, "warning", `The path <code>${esc(key)}</code> contains spaces.`);
+      if (!key.startsWith("/")) add(ln, "error", fmt(T.checkInvalidPath, esc(key)));
+      else if (/\s/.test(key)) add(ln, "warning", fmt(T.checkPathSpaces, esc(key)));
       patch.keys.push(key);
       patch.keyLines.push(ln);
     }
   };
   const inScope = (ln, instr) => {
     if (!patch || !patch.keys.length) {
-      add(ln, "error", "This line is not inside a patch. Start one with <code>&gt;/Lotus/…</code> first.");
+      add(ln, "error", T.checkOutsidePatch);
       return false;
     }
     if (instr && patch.newType) {
-      add(ln, "warning", "Instructions are ignored in a new type (+) patch. Only Key=Value lines are used.");
+      add(ln, "warning", T.checkNewTypeInstructions);
       return false;
     }
     return true;
   };
   const condCheck = (ln, cond) => {
-    if (!cond.trim()) { add(ln, "error", "This condition is empty."); return; }
-    if (/\bcan_add_new_types\b(?!\s*\()/.test(cond)) add(ln, "error", "<code>can_add_new_types</code> needs parentheses: <code>can_add_new_types()</code>. Without them the condition is always true.");
-    if (/(^|[^"\d.])\d{4}\.\d{2}\.\d{2}/.test(cond)) add(ln, "error", "Build versions must be quoted and compared with compareversions(), e.g. <code>compareversions(owf_get_build_version(), \"2021.12.15.00.15\") &gt;= 0</code>.");
+    if (!cond.trim()) { add(ln, "error", T.checkConditionEmpty); return; }
+    if (/\bcan_add_new_types\b(?!\s*\()/.test(cond)) add(ln, "error", T.checkNeedsParens);
+    if (/(^|[^"\d.])\d{4}\.\d{2}\.\d{2}/.test(cond)) add(ln, "error", T.checkQuoteBuild);
     const allowed = new Set(["can_add_new_types", "compareversions", "owf_get_build_version", "and", "or", "not", "true", "false", "nil"]);
     const names = (cond.replace(/"[^"]*"/g, "").match(/[A-Za-z_]\w*/g) || []).filter((n) => !allowed.has(n));
-    if (names.length) add(ln, "error", `Unknown name in the condition: <code>${esc(names.join(", "))}</code>. Only can_add_new_types(), compareversions() and owf_get_build_version() are available.`);
-    for (const m of cond.matchAll(/"([^"]*)"/g)) if (!/^\d{4}(\.\d{2}){4}$/.test(m[1])) add(ln, "warning", `<code>${esc(m[1])}</code> does not look like a build version (YYYY.MM.DD.HH.MM).`);
+    if (names.length) add(ln, "error", fmt(T.checkUnknownName, esc(names.join(", "))));
+    for (const m of cond.matchAll(/"([^"]*)"/g)) if (!/^\d{4}(\.\d{2}){4}$/.test(m[1])) add(ln, "warning", fmt(T.checkBadBuild, esc(m[1])));
     let d = 0;
     for (const c of cond) { if (c === "(") d++; if (c === ")" && --d < 0) break; }
-    if (d !== 0) add(ln, "error", "The parentheses in this condition are not balanced.");
-    if (/compareversions\s*\([^)]*\)\s*$/.test(cond)) add(ln, "warning", "compareversions() returns a number. Compare it, e.g. <code>&gt;= 0</code>.");
+    if (d !== 0) add(ln, "error", T.checkParentheses);
+    if (/compareversions\s*\([^)]*\)\s*$/.test(cond)) add(ln, "warning", T.checkCompareResult);
   };
 
   text.split("\n").forEach((rawLine, i) => {
@@ -1667,26 +1770,26 @@ function parsePatchText(text) {
     const t = line.trim();
     if (t === "$if" || t.startsWith("$if ")) { condCheck(ln, t.slice(4)); blocks.push({ ln, hasElse: false }); return; }
     if (t === "$elseif" || t.startsWith("$elseif ")) {
-      if (!blocks.length) add(ln, "error", "$elseif without a matching $if.");
-      else { if (blocks.at(-1).hasElse) add(ln, "warning", "$elseif after $else is never reached."); condCheck(ln, t.slice(8)); }
+      if (!blocks.length) add(ln, "error", T.checkStrayElseif);
+      else { if (blocks.at(-1).hasElse) add(ln, "warning", T.checkElseifAfterElse); condCheck(ln, t.slice(8)); }
       return;
     }
     if (t.startsWith("$else")) {
-      if (t !== "$else") add(ln, "warning", `Unknown directive <code>${esc(t)}</code>, it is read as $else.`);
-      if (!blocks.length) add(ln, "error", "$else without a matching $if.");
-      else { if (blocks.at(-1).hasElse) add(ln, "warning", "This block already has an $else."); blocks.at(-1).hasElse = true; }
+      if (t !== "$else") add(ln, "warning", fmt(T.checkUnknownDirective, esc(t)));
+      if (!blocks.length) add(ln, "error", T.checkStrayElse);
+      else { if (blocks.at(-1).hasElse) add(ln, "warning", T.checkDuplicateElse); blocks.at(-1).hasElse = true; }
       return;
     }
     if (t.startsWith("$endif")) {
-      if (!blocks.length) add(ln, "error", "$endif without a matching $if.");
+      if (!blocks.length) add(ln, "error", T.checkStrayEndif);
       else blocks.pop();
       return;
     }
     if (line.startsWith("/")) {
-      if (patch && patch.depth > 0) add(ln, "error", "This line starts with / so OpenWF reads it as a new path, not as part of the value above. Indent it.");
+      if (patch && patch.depth > 0) add(ln, "error", T.checkSlashLine);
       if (amp) amp = false;
       else {
-        add(ln, "warning", "Starting a patch with / is deprecated. Use <code>&gt;" + esc(t) + "</code>, or indent the line if it belongs to the patch above.");
+        add(ln, "warning", fmt(T.checkSlashDeprecated, esc(t)));
         start(ln);
       }
       let l = t;
@@ -1696,7 +1799,7 @@ function parsePatchText(text) {
     }
     amp = false;
     if (t.startsWith("&")) {
-      if (!patch) { add(ln, "error", "A line starting with & must follow a &gt; line."); start(ln); }
+      if (!patch) { add(ln, "error", T.checkAmpFollow); start(ln); }
       amp = true;
       let l = t.slice(1).trim();
       if (l.endsWith("&")) l = l.slice(0, -1);
@@ -1705,67 +1808,67 @@ function parsePatchText(text) {
       start(ln);
       let l = t.slice(1).trim();
       if (l.endsWith("&")) { amp = true; l = l.slice(0, -1); }
-      if (!l.trim() && !amp) add(ln, "error", "&gt; must be followed by a path.");
+      if (!l.trim() && !amp) add(ln, "error", T.checkPathAfterGt);
       addKeys(l, ln);
     } else if (t.startsWith("+")) {
       start(ln);
       const sep = t.indexOf("|", 1);
-      if (sep < 0) { add(ln, "error", "A new type needs a parent: <code>+/Lotus/Path|/Lotus/ParentPath</code>."); return; }
+      if (sep < 0) { add(ln, "error", T.checkNeedsParent); return; }
       const path = t.slice(1, sep).trim(), parent = t.slice(sep + 1).trim();
       patch.newType = { path, parent, line: ln };
       addKeys(path, ln);
-      if (!parent.startsWith("/")) add(ln, "error", "The parent type must be a full path starting with /.");
+      if (!parent.startsWith("/")) add(ln, "error", T.checkParentPath);
     } else if (/^[rsqa]\|/.test(t)) {
       const kind = t[0];
       const sep = t.indexOf("|", 2);
       const what = { r: "find|replace", s: "regex|replacement", q: "path|value", a: "path|value" }[kind];
-      if (sep < 0) { add(ln, "error", `Malformed line. Expected <code>${kind}|${what}</code>.`); return; }
+      if (sep < 0) { add(ln, "error", fmt(T.checkMalformed, kind, what)); return; }
       if (!inScope(ln, true)) return;
       const a = t.slice(2, sep), b = t.slice(sep + 1).replace(/\|+$/, "");
-      if (!a) add(ln, "error", `The ${kind === "r" ? "search text" : kind === "s" ? "regex" : "path"} is empty.`);
+      if (!a) add(ln, "error", kind === "r" ? T.searchEmpty : kind === "s" ? T.regexEmpty : T.pathEmpty);
       if (kind === "s") {
-        try { new RegExp(a.replace(/^\(\?[a-z]+\)/, "")); } catch (e) { add(ln, "error", "Invalid regex: " + esc(e.message)); }
+        try { new RegExp(a.replace(/^\(\?[a-z]+\)/, "")); } catch (e) { add(ln, "error", fmt(T.invalidRegexMsg, esc(e.message))); }
       }
-      if ((kind === "q" || kind === "a") && /\s/.test(a)) add(ln, "warning", "This path contains spaces.");
-      if (kind === "q" && b === "") add(ln, "warning", "The value is empty.");
-      if (kind === "a" && braceDepth(b) !== 0) add(ln, "error", "The braces in this value are not balanced.");
-      if (kind === "r" && a === b) add(ln, "info", "This replacement changes nothing.");
+      if ((kind === "q" || kind === "a") && /\s/.test(a)) add(ln, "warning", T.checkFieldSpaces);
+      if (kind === "q" && b === "") add(ln, "warning", T.checkValueEmpty);
+      if (kind === "a" && braceDepth(b) !== 0) add(ln, "error", T.checkBraces);
+      if (kind === "r" && a === b) add(ln, "info", T.checkReplacementChangesNothing);
       patch[kind].push({ ln, a, b });
     } else if (t.startsWith("$")) {
       if (!inScope(ln, true)) return;
       for (const f of t.slice(1).split(";")) {
         if (f === "clear" || f === "debug") patch.flags.push(f);
-        else add(ln, "warning", `Unknown flag <code>${esc(f)}</code>. Known flags: clear, debug.`);
+        else add(ln, "warning", fmt(T.checkUnknownFlag, esc(f)));
       }
     } else if (t && !t.startsWith("#")) {
       if (!inScope(ln, false)) return;
       if (patch.depth > 0) {
         if (patch.newType && ONE_LINE_OBJECT.test(t)) add(ln, "error", ONE_LINE_MESSAGE);
-        if (t.startsWith("{") && patch.prevVal?.endsWith("}")) add(ln, "error", "A comma is missing after the <code>}</code> on the line above. List entries must be separated by <code>},</code> or the game can softlock.");
+        if (t.startsWith("{") && patch.prevVal?.endsWith("}")) add(ln, "error", T.checkMissingComma);
         patch.prevVal = t;
         patch.depth += braceDepth(t);
-        if (patch.depth < 0) add(ln, "error", "There are more } than {.");
+        if (patch.depth < 0) add(ln, "error", T.checkExtraBrace);
         return;
       }
       const eq = t.indexOf("=");
-      if (eq < 1) { add(ln, "warning", "This line is added to the metadata as it is. Expected <code>Key=Value</code>."); return; }
+      if (eq < 1) { add(ln, "warning", T.checkRawLine); return; }
       const key = t.slice(0, eq).trim(), val = t.slice(eq + 1).trim();
-      if (patch.prefix.some((x) => x.key === key)) add(ln, "warning", `<code>${esc(key)}</code> is set twice in this patch. Only the first one is used.`);
-      if (val === "") add(ln, "warning", `<code>${esc(key)}</code> is given an empty value.`);
+      if (patch.prefix.some((x) => x.key === key)) add(ln, "warning", fmt(T.checkSetTwice, esc(key)));
+      if (val === "") add(ln, "warning", fmt(T.checkEmptyValue, esc(key)));
       if (patch.newType && ONE_LINE_OBJECT.test(val)) add(ln, "error", ONE_LINE_MESSAGE);
       const d = braceDepth(val);
-      if (d < 0) add(ln, "error", "There are more } than {.");
+      if (d < 0) add(ln, "error", T.checkExtraBrace);
       if (d > 0) { patch.depth = d; patch.depthLine = ln; }
       patch.prefix.push({ ln, key, val });
     }
   });
   close();
-  for (const b of blocks) add(b.ln, "error", "$if without a matching $endif.");
-  if (!patches.some((p) => p.keys.length) && text.trim()) add(1, "error", "No patch found. A patch starts with <code>&gt;/Lotus/…</code>.");
+  for (const b of blocks) add(b.ln, "error", T.checkMissingEndif);
+  if (!patches.some((p) => p.keys.length) && text.trim()) add(1, "error", T.checkNoPatchFound);
   for (const p of patches) {
     const empty = !p.prefix.length && !p.q.length && !p.a.length && !p.r.length && !p.s.length && !p.flags.length;
-    if (p.keys.length && empty && !p.newType && !p.inCond) add(p.line, "info", "This patch has no instructions.");
-    if (p.flags.includes("clear") && !p.prefix.length) add(p.line, "warning", "$clear with no Key=Value lines leaves this type empty.");
+    if (p.keys.length && empty && !p.newType && !p.inCond) add(p.line, "info", T.checkEmptyPatch);
+    if (p.flags.includes("clear") && !p.prefix.length) add(p.line, "warning", T.checkClearEmpty);
   }
   return { patches, diags };
 }
@@ -1790,45 +1893,45 @@ async function verifyPatch(parsed) {
   });
   const newTypes = new Set(parsed.patches.filter((p) => p.newType).map((p) => p.newType.path));
   await Promise.all(parsed.patches.filter((p) => p.newType?.parent.startsWith("/") && !newTypes.has(p.newType.parent)).map(async (p) => {
-    if (!(await loadType(p.newType.parent))) add(p.newType.line, "error", `The parent <code>${esc(p.newType.parent)}</code> does not exist in the game data.`);
+    if (!(await loadType(p.newType.parent))) add(p.newType.line, "error", fmt(T.checkMissingParent, esc(p.newType.parent)));
   }));
   await Promise.all([...uses].map(async ([path, list]) => {
     const t = await loadType(path);
     if (!t) {
-      if (!newTypes.has(path)) add(list[0].ln, "error", `<code>${esc(path)}</code> does not exist in the game data. Check the spelling and capitals.`);
+      if (!newTypes.has(path)) add(list[0].ln, "error", fmt(T.checkMissingPath, esc(path)));
       return;
     }
-    if (newTypes.has(path)) add(list[0].ln, "warning", `<code>${esc(tail(path))}</code> already exists, so the + line will not create it.`);
-    const own = t.own, raw = eeText(own), name = esc(tail(path) + (path.startsWith("/Lotus/StoreItems/") ? " (store item)" : ""));
+    if (newTypes.has(path)) add(list[0].ln, "warning", fmt(T.checkTypeExists, esc(tail(path))));
+    const own = t.own, raw = eeText(own), name = esc(path.startsWith("/Lotus/StoreItems/") ? fmt(T.storeItemName, tail(path)) : tail(path));
     if (!Object.keys(t.data).length) {
-      if (list.some(({ p }) => p.q.length || p.a.length || p.r.length || p.s.length)) add(list[0].ln, "info", `The game data has no fields for ${name}, so its lines can't be checked here.`);
+      if (list.some(({ p }) => p.q.length || p.a.length || p.r.length || p.s.length)) add(list[0].ln, "info", fmt(T.checkNoFields, name));
       return;
     }
     for (const { p } of list) {
       for (const q of p.q) {
         const v = getAt(own, q.a.split("."));
-        if (v === undefined) add(q.ln, "error", `<code>${esc(q.a)}</code> does not exist in ${name}${getAt(t.data, q.a.split(".")) !== undefined ? " itself (it is inherited from a parent type, use a Key=Value line instead)" : ""}.`);
-        else if (isObj(v)) add(q.ln, "error", `<code>${esc(q.a)}</code> is a list or object in ${name}, q| can only set a single value.`);
-        else if (typeof v === "number" && (q.b.trim() === "" || isNaN(Number(q.b)))) add(q.ln, "error", `<code>${esc(q.a)}</code> is a number, but the value <code>${esc(q.b)}</code> is not.`);
+        if (v === undefined) add(q.ln, "error", fmt(getAt(t.data, q.a.split(".")) !== undefined ? T.notInItemInherited : T.notInItem, esc(q.a), name));
+        else if (isObj(v)) add(q.ln, "error", fmt(T.checkNotScalar, esc(q.a), name));
+        else if (typeof v === "number" && (q.b.trim() === "" || isNaN(Number(q.b)))) add(q.ln, "error", fmt(T.checkNotNumber, esc(q.a), esc(q.b)));
       }
       for (const a of p.a) {
         const v = getAt(own, a.a.split("."));
-        if (!Array.isArray(v)) add(a.ln, "error", `<code>${esc(a.a)}</code> is not a list in ${name}${v === undefined ? " (it does not exist there)" : ""}.`);
+        if (!Array.isArray(v)) add(a.ln, "error", fmt(v === undefined ? T.notListMissing : T.notListIn, esc(a.a), name));
         else if (v.length) {
           const want = isObj(v[0]) ? "object" : typeof v[0];
           const got = a.b.startsWith("{") ? "object" : /^[-+]?(\d+\.?\d*|\.\d+)$/.test(a.b) ? "number" : "string";
-          if (want !== got) add(a.ln, "error", `The items of <code>${esc(a.a)}</code> are ${want === "object" ? "objects" : want + "s"}, but this value is ${got === "object" ? "an object" : "a " + got}.`);
+          if (want !== got) add(a.ln, "error", fmt(T.itemsMismatch, esc(a.a), { object: T.objects, string: T.strings, number: T.numbers }[want], { object: T.anObject, string: T.aString, number: T.aNumber }[got]));
         }
       }
-      for (const r of p.r) if (r.a && !raw.includes(r.a)) add(r.ln, "warning", `<code>${esc(r.a)}</code> was not found in ${name}, this replacement does nothing.`);
+      for (const r of p.r) if (r.a && !raw.includes(r.a)) add(r.ln, "warning", fmt(T.checkReplaceNoMatch, esc(r.a), name));
       for (const x of p.s) {
         const m = x.a.match(/^\(\?([a-z]+)\)/);
         let re = null;
         try { re = new RegExp(m ? x.a.slice(m[0].length) : x.a, (m ? m[1].replace(/[^ims]/g, "") : "")); } catch {}
-        if (re && !re.test(raw)) add(x.ln, "warning", `<code>${esc(x.a)}</code> matches nothing in ${name}, this substitution does nothing.`);
+        if (re && !re.test(raw)) add(x.ln, "warning", fmt(T.checkRegexNoMatch, esc(x.a), name));
       }
       for (const pr of p.prefix) {
-        if (!(pr.key in t.data)) add(pr.ln, "info", `<code>${esc(pr.key)}</code> is not set on ${name} yet, it will be added.`);
+        if (!(pr.key in t.data)) add(pr.ln, "info", fmt(T.checkWillAdd, esc(pr.key), name));
       }
     }
   }));
@@ -1846,8 +1949,8 @@ function pathList(p) {
   const more = h("button", { class: "rmore", type: "button", onclick: (e) => {
     e.stopPropagation();
     full.hidden = !full.hidden;
-    more.textContent = full.hidden ? `+ ${keys.length - 1} more paths` : "Show less";
-  } }, `+ ${keys.length - 1} more paths`);
+    more.textContent = full.hidden ? fmt(T.morePaths, keys.length - 1) : T.showLess;
+  } }, fmt(T.morePaths, keys.length - 1));
   el.append(h("span", {}, keys[0]), " ", more, full);
   return el;
 }
@@ -1863,10 +1966,10 @@ function initCheck() {
     diags.sort((a, b) => order[a.sev] - order[b.sev] || a.line - b.line);
     const n = (s) => diags.filter((d) => d.sev === s).length;
     const e = n("error"), w = n("warning");
-    $("#check-summary").innerHTML = pending ? '<span class="spinner"></span>Checking game data…' : ta.value.trim() ? `${e} error${e === 1 ? "" : "s"}, ${w} warning${w === 1 ? "" : "s"}` : "";
+    $("#check-summary").innerHTML = pending ? '<span class="spinner"></span>' + T.checkingGameData : ta.value.trim() ? `${e} error${e === 1 ? "" : "s"}, ${w} warning${w === 1 ? "" : "s"}` : "";
     const res = $("#check-results");
-    if (!ta.value.trim()) { res.replaceChildren(h("div", { class: "ok" }, "Paste a patch to check it.")); return; }
-    if (!diags.length && !pending) { res.replaceChildren(h("div", { class: "ok" }, "No problems found.")); return; }
+    if (!ta.value.trim()) { res.replaceChildren(h("div", { class: "ok" }, T.pasteHint)); return; }
+    if (!diags.length && !pending) { res.replaceChildren(h("div", { class: "ok" }, T.noProblemsFound)); return; }
     const blocks = patches.filter((p) => p.keys.length).sort((a, b) => a.line - b.line);
     const owner = (line) => { let o = null; for (const p of blocks) if (p.line <= line) o = p; return o; };
     const groups = new Map([[null, []], ...blocks.map((p) => [p, []])]);
@@ -1876,17 +1979,17 @@ function initCheck() {
       const msg = h("span", { class: "msg" });
       msg.innerHTML = d.msg;
       return h("div", { class: "res " + d.sev, onclick: () => goLine(d.line) },
-        h("span", { class: "ln" }, "Line " + d.line), h("span", { class: "sev" }, { error: "Error", warning: "Warning", info: "Note" }[d.sev]), msg);
+        h("span", { class: "ln" }, fmt(T.lineN, d.line)), h("span", { class: "sev" }, { error: T.error, warning: T.warning, info: T.note }[d.sev]), msg);
     };
     const count = (ds) => {
       const e = ds.filter((d) => d.sev === "error").length, w = ds.filter((d) => d.sev === "warning").length;
-      return !ds.length ? "No problems" : [e && `${e} error${e === 1 ? "" : "s"}`, w && `${w} warning${w === 1 ? "" : "s"}`, !e && !w && "Notes only"].filter(Boolean).join(", ");
+      return !ds.length ? T.noProblems : [e && `${e} error${e === 1 ? "" : "s"}`, w && `${w} warning${w === 1 ? "" : "s"}`, !e && !w && T.notesOnly].filter(Boolean).join(", ");
     };
     res.replaceChildren(...[...groups].filter(([, ds]) => ds.length).map(([p, ds]) => {
       const worst = ds.some((d) => d.sev === "error") ? "error" : ds.some((d) => d.sev === "warning") ? "warning" : "clean";
       return h("div", { class: "rgroup " + worst },
         h("div", { class: "rhead", onclick: () => p && goLine(p.line) },
-          p ? pathList(p) : h("span", { class: "rpath" }, "General"),
+          p ? pathList(p) : h("span", { class: "rpath" }, T.general),
           h("span", { class: "rcount" }, count(ds))),
         ds.map(item));
     }));
@@ -1960,9 +2063,9 @@ const glowFrom = (rgb) => {
 };
 async function analyzeCharacter(path) {
   const t = await loadType(path);
-  if (!t) return { error: path + " was not found in the game data." };
+  if (!t) return { error: fmt(T.pathNotFound, path) };
   const d = t.data, at = (k) => t.origin[k] || path;
-  if (!d.Mesh) return { error: "This character has no body of its own, so it can't be turned into a skin." };
+  if (!d.Mesh) return { error: T.noBody };
   const matKey = d.OverrideMaterials ? "OverrideMaterials" : "OverrideMaterial";
   const mats = (d[matKey] || []).map((m) => relTo(at(matKey), m));
   const children = (d.AutoSimChildren || []).map((c) => ({ ...c, Type: relTo(at("AutoSimChildren"), c.Type) }));
@@ -1984,19 +2087,19 @@ async function analyzeCharacter(path) {
     const glow = mt?.data["PS:EmissiveTintColorHi"];
     const own = !!mt && "PS:EmissiveTintColorHi" in mt.own;
     if (glow && hueOf(glow) !== hueOf(color)) {
-      if (own && scriptColor) note = "Its energy color is set by a fight script, not by its material, so the skin keeps the material's own glow color.";
+      if (own && scriptColor) note = T.scriptColorNote;
       else fix = { material: mats[0], ...glowFrom(rgbOf(color)) };
     }
   }
   const name = loc(d.LocalizeTag) || loc(d.LocTag) || tail(path);
   return { path, name: stripTags(name), icon: d.Icon || "", mesh: d.Mesh, mats, head, parts, fix, note };
 }
-const WEAPON_ROOTS = { LotusLongGun: "Every primary weapon", LotusPistol: "Every secondary weapon", PlayerMeleeWeapon: "Every melee weapon" };
+const WEAPON_ROOTS = { LotusLongGun: T.everyPrimaryWeapon, LotusPistol: T.everySecondaryWeapon, PlayerMeleeWeapon: T.everyMeleeWeapon };
 const WEAPON_SKIN = "/Lotus/Types/Game/LotusWeaponCustomization";
 async function analyzeWeapon(path) {
   const t = await loadType(path);
-  if (!t) return { error: path + " was not found in the game data." };
-  if (!t.data.PickUpMesh) return { error: "This weapon has no model listed in its data, so it can't be turned into a skin." };
+  if (!t) return { error: fmt(T.pathNotFound, path) };
+  if (!t.data.PickUpMesh) return { error: T.noWeaponModel };
   const item = (await loadList("weapon").catch(() => [])).find((i) => i.path === path);
   return {
     kind: "weapon", path, name: item?.name || tail(path), icon: item?.icon || t.data.Icon || "",
@@ -2010,7 +2113,7 @@ const skinStore = (path, type, name, extra = []) => skinBlock(`+${path}|${CUSTOM
 function skinNameField() {
   const name = h("input", { class: "input", value: sk.name, spellcheck: "false", autocomplete: "off" });
   name.addEventListener("input", () => { sk.name = name.value; renderSkin(); });
-  return field("Skin name", name);
+  return field(T.skinName, name);
 }
 function skinTargetField(label, target) {
   target.addEventListener("change", () => { sk.target = target.value; renderSkin(); });
@@ -2021,22 +2124,21 @@ function drawWeaponSkinForm(weapons) {
   const opt = (value, label) => h("option", { value, selected: value === sk.target }, label);
   const target = h("select", { class: "input" },
     info.root ? opt(info.root, WEAPON_ROOTS[tail(info.root)]) : null,
-    h("optgroup", { label: "One weapon" }, weapons.map((w) => opt(w.path, w.name))));
+    h("optgroup", { label: T.oneWeapon }, weapons.map((w) => opt(w.path, w.name))));
   $("#skin-form").replaceChildren(
     skinNameField(),
-    skinTargetField("Who can use it", target));
+    skinTargetField(T.whoCanUse, target));
 }
 const weaponSkinKey = (label) => label.replace(/[^A-Za-z0-9]/g, "") || "CustomWeaponSkin";
 function drawSkinNote() {
   const note = $("#skin-note"), weapon = sk?.info?.kind === "weapon";
   note.hidden = !weapon;
   if (!weapon) return;
-  note.replaceChildren("Add the item to your inventory using WebUI (Raw) or buy it in the market in-game for 1 ",
-    h("img", { class: "credit-icon", src: IMG + "/Lotus/Interface/Icons/StoreIcons/Currency/CreditsLarge.png", alt: "credit", onerror: hideBroken }), ". Not owning the skin will revert to default weapon appearance.");
+  note.replaceChildren(...fmtNodes(T.ownSkinNote, h("img", { class: "credit-icon", src: IMG + "/Lotus/Interface/Icons/StoreIcons/Currency/CreditsLarge.png", alt: "credit", onerror: hideBroken })));
 }
 function buildWeaponSkin() {
   const info = sk.info;
-  const label = sk.name.trim() || info.name + " Skin";
+  const label = sk.name.trim() || fmt(T.nameSkin, info.name);
   const key = weaponSkinKey(label);
   const sp = SKIN_DIR + key, ssp = SKIN_STORE_DIR + key;
   const out = ["# " + label, "$if can_add_new_types()", "",
@@ -2046,21 +2148,33 @@ function buildWeaponSkin() {
   return out.join("\n") + "\n";
 }
 let sk = null;
-async function showSkin(path) {
-  sk = { path, info: null, name: "", target: ALL_SUITS, parts: "both", lockHelmet: true, picked: new Set() };
+async function showSkin(path, asSuit = false) {
+  sk = { path, desc: "", useLook: true, info: null, name: "", target: ALL_SUITS, parts: "both", lockHelmet: true, picked: new Set() };
   $("#skin-title").textContent = tail(path);
   $("#skin-path").textContent = path;
   $("#skin-icon").removeAttribute("src");
   $("#skin-output").innerHTML = "";
   $("#skin-note").hidden = true;
-  $("#skin-form").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), "Reading the game data…"));
+  $("#skin-form").replaceChildren(h("div", { class: "empty" }, h("span", { class: "spinner" }), T.readingGameData));
+  if (asSuit) {
+    const info = await analyzeAvatarSuit(path).catch(() => ({ error: OFFLINE }));
+    if (!sk || sk.path !== path) return;
+    if (info.error) { $("#skin-form").replaceChildren(h("div", { class: "empty" }, info.error)); return; }
+    sk.info = info;
+    sk.name = info.name;
+    $("#skin-title").textContent = info.name;
+    if (info.icon) setIcon($("#skin-icon"), info.icon);
+    drawAvatarSuitForm();
+    renderSkin();
+    return;
+  }
   const weapon = path.startsWith("/Lotus/Weapons/");
   const [info, chars] = await Promise.all([(weapon ? analyzeWeapon(path) : analyzeCharacter(path)).catch(() => ({ error: OFFLINE })), loadCharacters(), loadDict().catch(() => null)]);
   if (!sk || sk.path !== path) return;
   if (info.error) { $("#skin-form").replaceChildren(h("div", { class: "empty" }, info.error)); return; }
   if (weapon) {
     sk.info = info;
-    sk.name = info.name + " Skin";
+    sk.name = fmt(T.nameSkin, info.name);
     sk.target = info.root || path;
     $("#skin-title").textContent = info.name;
     if (info.icon) setIcon($("#skin-icon"), info.icon);
@@ -2074,7 +2188,7 @@ async function showSkin(path) {
   info.name = known?.name || info.name;
   info.icon = known?.icon || info.icon;
   sk.info = info;
-  sk.name = info.name + " Skin";
+  sk.name = fmt(T.nameSkin, info.name);
   sk.parts = info.head.length ? "both" : "body";
   info.parts.forEach((c, i) => { if (!isFx(c.Type)) sk.picked.add(i); });
   $("#skin-title").textContent = info.name;
@@ -2084,7 +2198,7 @@ async function showSkin(path) {
 }
 function drawSkinForm(suits) {
   const info = sk.info;
-  const target = h("select", { class: "input" }, h("option", { value: ALL_SUITS }, "Every Warframe"), suits.map((s) => h("option", { value: s.path, selected: s.path === sk.target }, s.name)));
+  const target = h("select", { class: "input" }, h("option", { value: ALL_SUITS }, T.everyWarframe), suits.map((s) => h("option", { value: s.path, selected: s.path === sk.target }, s.name)));
   const check = (label, on, set) => {
     const box = h("input", { type: "checkbox", checked: on });
     box.addEventListener("change", () => { set(box.checked); renderSkin(); });
@@ -2092,29 +2206,30 @@ function drawSkinForm(suits) {
   };
   const partName = (c) => {
     const what = humanize(tail(c.Type).replace(/(Deco|NPC|Cloth)+$/g, ""));
-    const b = String(c.BoneName || ""), side = /_L\d_/.test(b) ? "Left " : /_R\d_/.test(b) ? "Right " : "";
-    const where = /CHEST/.test(b) ? "Chest" : /LEG|KNEE|THIGH|FOOT/.test(b) ? side + "leg" : /TWIST|ARM|SHOULDER|CLAVICLE|HAND/.test(b) ? side + "arm" : /SPINE|BACK/.test(b) ? "Back" : /HEAD|NECK/.test(b) ? "Head" : "";
-    return where ? where.charAt(0).toUpperCase() + where.slice(1) + " piece (" + what + ")" : what;
+    const b = String(c.BoneName || ""), left = /_L\d_/.test(b), right = /_R\d_/.test(b);
+    const where = /CHEST/.test(b) ? T.chest : /LEG|KNEE|THIGH|FOOT/.test(b) ? (left ? T.leftLeg : right ? T.rightLeg : T.leg) : /TWIST|ARM|SHOULDER|CLAVICLE|HAND/.test(b) ? (left ? T.leftArm : right ? T.rightArm : T.arm) : /SPINE|BACK/.test(b) ? T.back : /HEAD|NECK/.test(b) ? T.head : "";
+    return where ? fmt(T.partPiece, where, what) : what;
   };
   $("#skin-form").replaceChildren(...[
     skinNameField(),
-    skinTargetField("Who can wear it", target),
-    h("div", { class: "skin-list" }, h("span", { class: "label" }, "What to include"),
-      info.head.length ? [["both", "Body and helmet"], ["body", "Body only"], ["helmet", "Helmet only"]].map(([v, l]) => {
+    skinTargetField(T.whoCanWear, target),
+    h("div", { class: "skin-list" }, h("span", { class: "label" }, T.whatToInclude),
+      info.head.length ? [["both", T.bodyAndHelmet], ["body", T.bodyOnly], ["helmet", T.helmetOnly]].map(([v, l]) => {
         const r = h("input", { type: "radio", name: "skin-parts", value: v, checked: sk.parts === v });
         r.addEventListener("change", () => { sk.parts = v; drawSkinForm(suits); renderSkin(); });
         return h("label", { class: "check" }, r, h("span", {}, l));
-      }) : h("span", { class: "muted small" }, "Body only. This character has no separate helmet.")),
-    info.head.length && sk.parts === "both" ? check("Lock the helmet to this skin", sk.lockHelmet, (v) => (sk.lockHelmet = v)) : null,
-    info.parts.length && sk.parts !== "helmet" ? h("div", { class: "skin-list" }, h("span", { class: "label" }, "Attachments"),
-      info.parts.map((c, i) => check(partName(c) + (isFx(c.Type) ? " (effect)" : ""), sk.picked.has(i), (v) => (v ? sk.picked.add(i) : sk.picked.delete(i))))) : null,
-    info.fix && sk.parts !== "helmet" ? h("p", { class: "muted small" }, "The body material inherits a different glow color, so the patch also sets the right one on ", h("code", {}, tail(info.fix.material)), ". Only things that use this material are affected.") : null,
+      }) : h("span", { class: "muted small" }, T.noHelmetNote)),
+    info.head.length && sk.parts === "both" ? check(T.lockHelmet, sk.lockHelmet, (v) => (sk.lockHelmet = v)) : null,
+    info.parts.length && sk.parts !== "helmet" ? h("div", { class: "skin-list" }, h("span", { class: "label" }, T.attachments),
+      info.parts.map((c, i) => check(isFx(c.Type) ? fmt(T.partEffect, partName(c)) : partName(c), sk.picked.has(i), (v) => (v ? sk.picked.add(i) : sk.picked.delete(i))))) : null,
+    info.fix && sk.parts !== "helmet" ? h("p", { class: "muted small" }, fmtNodes(T.glowNote, h("code", {}, tail(info.fix.material)))) : null,
     info.note && sk.parts !== "helmet" ? h("p", { class: "warn" }, info.note) : null].filter(Boolean));
 }
 function buildSkin() {
   if (sk.info.kind === "weapon") return buildWeaponSkin();
+  if (sk.info.kind === "suit") return buildAvatarSuit();
   const info = sk.info, all = sk.target === ALL_SUITS;
-  const label = sk.name.trim() || info.name + " Skin";
+  const label = sk.name.trim() || fmt(T.nameSkin, info.name);
   const key = label.replace(/[^A-Za-z0-9]/g, "") || "CustomSkin";
   const vp = SKIN_DIR + key + "Variant", sp = SKIN_DIR + key, hp = SKIN_DIR + key + "Helmet";
   const ssp = SKIN_STORE_DIR + key, shp = SKIN_STORE_DIR + key + "Helmet";
@@ -2122,7 +2237,7 @@ function buildSkin() {
   const body = sk.parts !== "helmet";
   const helmet = sk.parts !== "body" && info.head.length > 0;
   const blocks = body ? [skinBlock(`+${vp}|/EE/Types/Game/WeaponSkin`, [["TpMeshOverride", info.mesh], info.mats.length && ["TpMaterialOverrides", info.mats]])] : [];
-  const helmetName = label.replace(/\s*Skin$/i, "") + " Helmet";
+  const helmetName = fmt(T.nameHelmet, label.replace(/\s*Skin$/i, ""));
   if (helmet) {
     blocks.push(skinBlock(`+${hp}|${CUSTOMIZATION}`, [["LocalizeTag", helmetName], info.icon && ["Icon", info.icon], ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["ExcludeFromCodex", 0], ...who, ["THIRD_PERSON_Attachment", { UpgradeAutoChildren: info.head }]]));
     blocks.push(skinStore(shp, hp, helmetName, [["ExcludeFromCodex", 0]]));
@@ -2142,18 +2257,18 @@ function renderSkin() {
 }
 function initSkin() {
   $("#skin-copy").onclick = () => { if (sk?.info) copyText(buildSkin()); };
-  $("#skin-save").onclick = () => { if (sk?.info) saveText(sk.name || "Skin", buildSkin(), "Skin"); };
+  $("#skin-save").onclick = () => { if (sk?.info) saveText(sk.name || T.skin, buildSkin(), T.skin); };
 }
 function route() {
   const hash = location.hash || "#/";
   const show = (id) => { for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== id; };
   closeAddMenu();
   if (hash.startsWith("#/skin")) {
-    const p = new URLSearchParams(hash.split("?")[1] || "").get("p");
+    const q = new URLSearchParams(hash.split("?")[1] || ""), p = q.get("p");
     if (!p?.startsWith("/Lotus/")) { location.hash = "#/eye"; return; }
     show("view-skin");
     window.scrollTo(0, 0);
-    showSkin(p);
+    showSkin(p, q.get("as") === "suit");
   } else if (hash === "#/eye") {
     show("view-eye");
     $("#eye-path").focus();
