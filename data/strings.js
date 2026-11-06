@@ -1,6 +1,13 @@
 window.TEXT = {
   appName: "Metadata Patch Builder",
   checkPatch: "Verify your patch",
+  patchCollection: "Patch Collection",
+  collectionIntro: "Check the <a href=\"https://onlyg.it/OpenWF/Mods/\" target=\"_blank\" rel=\"noopener\">Official repo</a> and do contribute to it with your own patches.",
+  collectionEmpty: "No patches yet.",
+  download: "Download",
+  select: "Select",
+  downloadSelected: "Download selected ({0})",
+  clearSelection: "Clear",
   sentientBuilder: "Sentient Builder",
   newPatch: "New patch",
   output: "Output",

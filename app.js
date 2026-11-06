@@ -2301,6 +2301,110 @@ function initSkin() {
   $("#skin-copy").onclick = () => { if (sk?.info) copyText(buildSkin()); };
   $("#skin-save").onclick = () => { if (sk?.info) saveText(sk.name || T.skin, buildSkin(), T.skin); };
 }
+const COLLECTION_LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? "http://127.0.0.1:8016" : "";
+const COLLECTION_REMOTE = "https://raw.githubusercontent.com/battlearmorambassador/eternalism/main";
+const collectionOpen = new Set();
+let collectionText = "", collectionFrom = "", collectionTimer = 0;
+async function fetchCollection() {
+  for (const from of [COLLECTION_LOCAL, COLLECTION_REMOTE]) {
+    if (!from) continue;
+    try {
+      const r = await fetch(from + "/collection.json", { cache: "no-store" });
+      if (r.ok) return [from, await r.text()];
+    } catch {}
+  }
+  return null;
+}
+const collectionPicked = new Set();
+const patchesIn = (n) => (n.type === "patch" ? [n] : n.children.flatMap(patchesIn));
+const collectionFile = (path) => collectionFrom + (collectionFrom === COLLECTION_LOCAL ? "/files/" : "/") + path.split("/").map(encodeURIComponent).join("/");
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => { for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });
+const crc32 = (bytes) => { let c = 0xffffffff; for (const b of bytes) c = CRC_TABLE[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+function zipFiles(files) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  const header = (sig, extra, crc, size, name) => {
+    const b = new DataView(new ArrayBuffer(extra + 26 + 4));
+    let o = 0;
+    b.setUint32(o, sig, true); o += 4;
+    if (extra) { b.setUint16(o, 20, true); o += 2; }
+    b.setUint16(o, 20, true); b.setUint16(o + 2, 0x0800, true); b.setUint16(o + 4, 0, true); b.setUint16(o + 6, 0, true); b.setUint16(o + 8, 0x21, true);
+    b.setUint32(o + 10, crc, true); b.setUint32(o + 14, size, true); b.setUint32(o + 18, size, true); b.setUint16(o + 22, name.length, true);
+    return b;
+  };
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.path), data = enc.encode(f.text), crc = crc32(data);
+    const local = header(0x04034b50, 0, crc, data.length, name);
+    parts.push(local, name, data);
+    const tail = new DataView(new ArrayBuffer(14));
+    tail.setUint32(10, offset, true);
+    central.push(header(0x02014b50, 2, crc, data.length, name), tail, name);
+    offset += local.byteLength + name.length + data.length;
+  }
+  const size = central.reduce((n, p) => n + p.byteLength, 0), end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, size, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end], { type: "application/zip" });
+}
+function saveBlob(name, blob) {
+  const url = URL.createObjectURL(blob), a = h("a", { href: url, download: name });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+async function downloadCollection(nodes, name) {
+  const seen = new Set(), patches = nodes.flatMap(patchesIn).filter((p) => !seen.has(p.path) && seen.add(p.path));
+  if (!patches.length) return;
+  $("#collection-status").textContent = "";
+  try {
+    const files = await Promise.all(patches.map(async (p) => {
+      const r = await fetch(collectionFile(p.path), { cache: "no-store" });
+      if (!r.ok) throw new Error(p.path);
+      return { path: p.path, text: await r.text() };
+    }));
+    if (files.length === 1 && nodes[0].type === "patch") saveBlob(tail(files[0].path), new Blob([files[0].text], { type: "text/plain" }));
+    else saveBlob(name + ".zip", zipFiles(files));
+  } catch { $("#collection-status").textContent = OFFLINE; }
+}
+function collectionTools(n) {
+  const pick = h("input", { type: "checkbox", class: "col-pick", title: T.select, onclick: (e) => e.stopPropagation() });
+  const paths = patchesIn(n).map((p) => p.path), count = paths.filter((p) => collectionPicked.has(p)).length;
+  pick.checked = paths.length > 0 && count === paths.length;
+  pick.indeterminate = count > 0 && count < paths.length;
+  pick.disabled = !paths.length;
+  pick.addEventListener("change", () => { for (const p of paths) pick.checked ? collectionPicked.add(p) : collectionPicked.delete(p); drawCollection(); });
+  return [pick, h("button", { class: "col-get", type: "button", title: T.download, onclick: (e) => { e.stopPropagation(); downloadCollection([n], n.name); } }, "↓")];
+}
+function collectionRows(nodes, depth) {
+  return nodes.flatMap((n) => {
+    const pad = { style: "padding-left:" + (depth * 22 + 8) + "px" }, open = collectionOpen.has(n.path), [pick, get] = collectionTools(n);
+    if (n.type === "patch") return [h("div", { class: "col-row", ...pad }, h("span", { class: "col-tw" }), pick, h("a", { class: "col-name", href: collectionFile(n.path), target: "_blank", rel: "noopener" }, n.name), h("span", { class: "col-desc" }, n.desc), get)];
+    const flip = () => { open ? collectionOpen.delete(n.path) : collectionOpen.add(n.path); drawCollection(); };
+    return [h("div", { class: "col-row col-folder", ...pad, onclick: flip }, h("span", { class: "col-tw" }, open ? "▾" : "▸"), pick, h("span", { class: "col-name" }, n.name), open ? null : h("span", { class: "col-desc" }, n.desc), patchesIn(n).length ? get : null), ...(open ? collectionRows(n.children, depth + 1) : [])];
+  });
+}
+function collectionNodes(nodes) {
+  return nodes.flatMap(patchesIn).filter((p) => collectionPicked.has(p.path));
+}
+function drawCollection() {
+  const tree = JSON.parse(collectionText).tree, picked = collectionNodes(tree), count = picked.length;
+  $("#collection-tree").classList.toggle("picking", picked.length > 0);
+  $("#collection-tree").replaceChildren(...(tree.length ? collectionRows(tree, 0) : [h("p", { class: "muted" }, T.collectionEmpty)]));
+  $("#collection-bar").hidden = !picked.length;
+  $("#collection-bar").replaceChildren(
+    h("button", { class: "btn", type: "button", onclick: () => downloadCollection(picked, T.patchCollection) }, fmt(T.downloadSelected, count)),
+    h("button", { class: "btn btn-ghost", type: "button", onclick: () => { collectionPicked.clear(); drawCollection(); } }, T.clearSelection));
+}
+async function updateCollection() {
+  const got = await fetchCollection();
+  if (!got) { if (!collectionText) $("#collection-tree").replaceChildren(h("p", { class: "muted" }, T.collectionEmpty)); return; }
+  if (got[1] === collectionText) return;
+  [collectionFrom, collectionText] = got;
+  drawCollection();
+}
+function showCollection() {
+  updateCollection();
+  clearInterval(collectionTimer);
+  if (COLLECTION_LOCAL) collectionTimer = setInterval(() => { if (location.hash === "#/collection") updateCollection(); else clearInterval(collectionTimer); }, 2000);
+}
 function route() {
   const hash = location.hash || "#/";
   const show = (id) => { for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== id; };
@@ -2314,6 +2418,9 @@ function route() {
   } else if (hash === "#/eye") {
     show("view-eye");
     $("#eye-path").focus();
+  } else if (hash === "#/collection") {
+    show("view-collection");
+    showCollection();
   } else if (hash === "#/check") {
     show("view-check");
     $("#check-input").focus();

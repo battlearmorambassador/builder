@@ -30,7 +30,7 @@
   <header class="bar">
     <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a><a class="navlink" href="#/collection" data-text="patchCollection">Patch Collection</a></nav>
   </header>
   <div class="choose-inner">
     <h2 class="choose-title" data-text="newPatchQuestion">What do you want to patch?</h2>
@@ -49,7 +49,7 @@
   <header class="bar">
     <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a><a class="navlink" href="#/collection" data-text="patchCollection">Patch Collection</a></nav>
   </header>
   <form class="eye-inner" id="eye-form">
     <label class="label" for="eye-path" data-text="item">Item</label>
@@ -77,7 +77,7 @@
   <header class="bar">
     <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a><a class="navlink" href="#/collection" data-text="patchCollection">Patch Collection</a></nav>
   </header>
   <div class="edit-head">
     <div class="target">
@@ -107,11 +107,25 @@
     <button class="btn btn-primary" id="skin-save" data-text="savePatch">Save patch</button>
   </footer>
 </section>
+<section id="view-collection" class="view" hidden>
+  <header class="bar">
+    <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
+    <span></span>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a><a class="navlink" href="#/collection" data-text="patchCollection">Patch Collection</a></nav>
+  </header>
+  <div class="collection">
+    <h2 class="choose-title" data-text="patchCollection">Patch Collection</h2>
+    <p class="muted collection-intro" data-text-html="collectionIntro"></p>
+    <div id="collection-tree"></div>
+    <p class="muted" id="collection-status"></p>
+    <div class="collection-bar" id="collection-bar" hidden></div>
+  </div>
+</section>
 <section id="view-check" class="view" hidden>
   <header class="bar">
     <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a><a class="navlink" href="#/collection" data-text="patchCollection">Patch Collection</a></nav>
   </header>
   <div class="check-head">
     <h2 class="choose-title" data-text="checkPatch">Verify your patch</h2>
@@ -146,7 +160,7 @@
       <button data-cat="weapon" data-text="weapon">Weapon</button>
       <button data-cat="upgrade" data-text="modsArcanes">Mods / Arcanes</button>
     </nav>
-    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a><a class="navlink" href="#/collection" data-text="patchCollection">Patch Collection</a></nav>
   </header>
   <div class="pick-tools">
     <input id="search" class="input search" type="search" data-text-placeholder="searchItems" placeholder="Search by name or path" autocomplete="off" spellcheck="false">
@@ -165,7 +179,7 @@
   <header class="bar">
     <a href="#/" class="brand" data-text="appName">Metadata Patch Builder</a>
     <span></span>
-    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a></nav>
+    <nav class="bar-right"><a class="navlink" href="#/pick" data-text="newPatch">New patch</a><a class="navlink" href="#/eye" data-text="sentientBuilder">Sentient Builder</a><a class="navlink" href="#/check" data-text="checkPatch">Verify your patch</a><a class="navlink" href="#/collection" data-text="patchCollection">Patch Collection</a></nav>
   </header>
   <div class="edit-head">
     <label class="label" for="patch-name" data-text="patchName">Patch name</label>
