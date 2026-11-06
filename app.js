@@ -1643,6 +1643,8 @@ function initEye() {
     status.textContent = "";
     $("#eye-choices").hidden = !kind;
     if (!kind) { if (p && input.value.trim()) status.textContent = failed ? OFFLINE : T.noDataFound; return; }
+    $("#eye-target").textContent = p;
+    $("#eye-target").hidden = input.value.trim() === p;
     showMode("asis", !kind.character);
     showMode("new", !kind.character);
     showMode("suit", !!kind.suit);
@@ -2131,7 +2133,7 @@ function drawWeaponSkinForm(weapons) {
     h("optgroup", { label: T.oneWeapon }, weapons.map((w) => opt(w.path, w.name))));
   $("#skin-form").replaceChildren(
     skinNameField(),
-    skinTargetField(T.whoCanUse, target));
+    skinTargetField(T.itemCompatibility, target));
 }
 const weaponSkinKey = (label) => label.replace(/[^A-Za-z0-9]/g, "") || "CustomWeaponSkin";
 function drawSkinNote() {
@@ -2216,7 +2218,7 @@ function drawSkinForm(suits) {
   };
   $("#skin-form").replaceChildren(...[
     skinNameField(),
-    skinTargetField(T.whoCanWear, target),
+    skinTargetField(T.itemCompatibility, target),
     h("div", { class: "skin-list" }, h("span", { class: "label" }, T.whatToInclude),
       info.head.length ? [["both", T.bodyAndHelmet], ["body", T.bodyOnly], ["helmet", T.helmetOnly]].map(([v, l]) => {
         const r = h("input", { type: "radio", name: "skin-parts", value: v, checked: sk.parts === v });
