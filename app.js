@@ -1566,10 +1566,23 @@ async function avatarLook(t, path, own, target) {
   const over = st.data.UpgradeSkinOverride;
   return { skin, helmet, mesh: relTo(t.origin.Mesh || path, t.data.Mesh), meshItem: typeof over === "string" ? relTo(st.origin.UpgradeSkinOverride || skin, over) : "", head, body: kids.filter((c) => !head.includes(c)) };
 }
+const FLAG = atob("ZW5lbXlTdWl0cw==");
+const extended = () => store.get(FLAG) === true;
+const SUIT_BASE = "/Lotus/Types/Game/PowerSuits/PlayerPowerSuit";
+async function newSuitInfo(t, path) {
+  const d = t.data, key = d.OverrideMaterials ? "OverrideMaterials" : "OverrideMaterial";
+  const mats = [].concat(d[key] || []).map((m) => relTo(t.origin[key] || path, m));
+  const name = stripTags(loc(d.LocTag) || tail(path).replace(/Avatar$/, ""));
+  const decos = (d.AutoSimChildren || []).map((c) => ({ ...c, Type: relTo(t.origin.AutoSimChildren || path, c.Type) })).filter((c) => !isFx(c.Type));
+  const npcSuit = (await loadCharacters()).npcSuit.get(path), st = npcSuit ? await loadType(npcSuit).catch(() => null) : null;
+  const abilities = (st?.data.AbilityTypes || []).filter((a) => typeof a === "string" && a).map((a) => relTo(st.origin.AbilityTypes || npcSuit, a));
+  return { kind: "suit", isNew: true, path, target: "/Lotus/Powersuits/Custom/" + tail(path).replace(/Avatar$/, "") + "Suit", mesh: relTo(t.origin.Mesh || path, d.Mesh), mats, decos, abilities, abilityCount: abilities.length, hasStore: false, look: null, tag: "", name, icon: d.Icon || "" };
+}
 async function analyzeAvatarSuit(path) {
   const t = await loadType(path);
   if (!t) return { error: fmt(T.pathNotFound, path) };
   const suit = await avatarSuitPath(t, path);
+  if (!suit && t.data.Mesh && extended()) return newSuitInfo(t, path);
   if (!suit) return { error: T.noSuit };
   const st = await loadType(suit);
   if (!st) return { error: fmt(T.pathNotFound, suit) };
@@ -1594,13 +1607,16 @@ function drawAvatarSuitForm() {
   $("#skin-form").replaceChildren(...[
     field(T.name, text("name")), field(T.description, text("desc")),
     h("p", { class: "muted small" }, info.abilityCount ? fmt(T.suitAdds, info.name, info.abilityCount === 1 ? T.oneAbility : fmt(T.countAbilities, info.abilityCount)) : fmt(T.suitAddsNoAbilities, info.name)),
+    info.isNew ? h("p", { class: "muted small" }, atob("RVhQRVJJTUVOVEFMOiBhbGwgbW9kZWxzIHdpbGwgc2hvdyBpbiBnYW1lIGJ1dCBub3QgYWxsIG9mIHRoZW0gd2lsbCBmaXQgc3RhbmRhcmQgV2FyZnJhbWUgcHJvcG9ydGlvbnMu")) : null,
     info.look ? h("label", { class: "check" }, lookBox, h("span", {}, T.useLook)) : null].filter(Boolean));
 }
 function buildAvatarSuit() {
   const info = sk.info, store = toStorePath(info.target), name = sk.name.trim() || info.name, desc = sk.desc.trim();
   const out = ["# " + name, "$if can_add_new_types()"];
+  if (info.isNew) out.push(...skinBlock(`+${info.target}|${SUIT_BASE}`, [["LocalizeTag", name], desc && ["LocalizeDescTag", desc], ["MarketMode", "MM_VISIBLE"], ["Mesh", info.mesh], info.mats.length && ["OverrideMaterials", info.mats], info.abilities.length && ["AbilityTypes", info.abilities], info.decos.length && ["AttachedFX", info.decos]]), "");
   if (!info.hasStore) out.push(...skinBlock(`+${store}|${POWER_SUIT_STORE}`, [["ProductCategory", "Suits"], ["LocalizeTag", name], desc && ["LocalizeDescTag", desc], ["TypeName", info.target], ["ShowInMarket", 1], ["RegularPrice", 1]]), "");
   out.push(">" + MANIFEST, indent("a|StoreItems|" + store), "$endif", "");
+  if (info.isNew) return out.join("\n") + "\n";
   const texts = [indent("LocalizeTag=" + eeStr(name)), ...(desc ? [indent("LocalizeDescTag=" + eeStr(desc))] : [])];
   if (info.hasStore) out.push(">" + store, indent("ShowInMarket=1"), indent("RegularPrice=1"), ...texts, "");
   out.push(">" + info.target, indent("MarketMode=MM_VISIBLE"), ...texts);
@@ -1617,7 +1633,7 @@ async function itemKind(path) {
   const chain = [path, ...t.parents];
   const character = chain.includes("/Lotus/Types/Player/TennoAvatar") || /^\/Lotus\/Types\/(Enemies|Friendly|Player)\//.test(path);
   const weapon = chain.some((p) => p.startsWith("/Lotus/Weapons/") || /LotusWeapon$/.test(p));
-  return { character, suit: character ? await avatarSuitPath(t, path).catch(() => null) : null, skin: weapon ? !!t.data.PickUpMesh : !!t.data.Mesh && !path.startsWith("/Lotus/Upgrades/") };
+  return { character, suit: character ? (await avatarSuitPath(t, path).catch(() => null)) || (extended() && !!t.data.Mesh) : null, skin: weapon ? !!t.data.PickUpMesh : !!t.data.Mesh && !path.startsWith("/Lotus/Upgrades/") };
 }
 function initEye() {
   const input = $("#eye-path"), np = $("#eye-newpath"), status = $("#eye-status");
@@ -1653,7 +1669,7 @@ function initEye() {
     showMode("new", !kind.character);
     showMode("suit", !!kind.suit);
     showMode("skin", kind.skin);
-    $("#eye-note").hidden = !kind.character;
+    $("#eye-note").hidden = !kind.character || (!!kind.suit && extended());
     $("#eye-note").textContent = kind.suit ? T.avatarNote : T.characterNote;
     const current = document.querySelector('input[name="eye-mode"]:checked');
     if (!current || current.disabled || p !== lastItem) {
@@ -1665,6 +1681,17 @@ function initEye() {
     $("#eye-new").hidden = mode() !== "new";
     suggest();
   };
+  const code = atob("YXJyb3d1cCxhcnJvd3VwLGFycm93ZG93bixhcnJvd2Rvd24sYXJyb3dsZWZ0LGFycm93cmlnaHQsYXJyb3dsZWZ0LGFycm93cmlnaHQsYixh").split(",");
+  let codeAt = 0;
+  input.addEventListener("keydown", (e) => {
+    const key = e.key.toLowerCase();
+    codeAt = key === code[codeAt] ? codeAt + 1 : key === code[0] ? 1 : 0;
+    if (codeAt > 8) e.preventDefault();
+    if (codeAt < code.length) return;
+    codeAt = 0;
+    store.set(FLAG, !extended());
+    checkItem().then(() => (status.textContent = extended() ? atob("RW5lbXkgc3VpdHMgdW5sb2NrZWQu") : atob("RW5lbXkgc3VpdHMgbG9ja2VkLg==")));
+  });
   input.addEventListener("change", checkItem);
   input.addEventListener("input", debounce(() => { const v = input.value.trim(); if (!v || /^\/|^lotus\//i.test(v) || byName.has(v.toLowerCase())) checkItem(); else { checkId++; status.textContent = ""; $("#eye-choices").hidden = true; } }, 300));
   np.addEventListener("input", () => (np.dataset.auto = ""));
@@ -2059,8 +2086,13 @@ function loadCharacters() {
     const seen = new Map();
     for (const c of npcs) seen.set(c.name, (seen.get(c.name) || 0) + 1);
     for (const c of npcs) c.label = seen.get(c.name) > 1 ? c.name + " (" + tail(c.path) + ")" : c.name;
-    return { suits: suits.filter((s) => s.suit).sort((a, b) => a.name.localeCompare(b.name)), all: suits.concat(npcs) };
-  }).catch(() => ({ suits: [], all: [] }));
+    const npcSuit = new Map();
+    for (const a of Object.values(e.agents || {})) {
+      const suit = (a.items || []).map((i) => i.type).find((x) => /Suit$/i.test(x));
+      if (suit) for (const v of Object.values(a.avatarTypes || {})) if (!npcSuit.has(v)) npcSuit.set(v, suit);
+    }
+    return { suits: suits.filter((s) => s.suit).sort((a, b) => a.name.localeCompare(b.name)), all: suits.concat(npcs), npcSuit };
+  }).catch(() => ({ suits: [], all: [], npcSuit: new Map() }));
   return charsPromise;
 }
 const relTo = (base, v) => (typeof v === "string" && v && !v.startsWith("/") ? base.slice(0, base.lastIndexOf("/") + 1) + v : v);
