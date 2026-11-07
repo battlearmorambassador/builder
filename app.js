@@ -1569,14 +1569,14 @@ async function avatarLook(t, path, own, target) {
 const FLAG = atob("ZW5lbXlTdWl0cw==");
 const extended = () => store.get(FLAG) === true;
 const SUIT_BASE = "/Lotus/Types/Game/PowerSuits/PlayerPowerSuit";
-async function newSuitInfo(t, path) {
+async function newSuitInfo(t, path, linked = null) {
   const d = t.data, key = d.OverrideMaterials ? "OverrideMaterials" : "OverrideMaterial";
   const mats = [].concat(d[key] || []).map((m) => relTo(t.origin[key] || path, m));
-  const name = stripTags(loc(d.LocTag) || tail(path).replace(/Avatar$/, ""));
   const decos = (d.AutoSimChildren || []).map((c) => ({ ...c, Type: relTo(t.origin.AutoSimChildren || path, c.Type) })).filter((c) => !isFx(c.Type));
-  const npcSuit = (await loadCharacters()).npcSuit.get(path), st = npcSuit ? await loadType(npcSuit).catch(() => null) : null;
+  const chars = await loadCharacters(), npcSuit = linked || chars.npcSuit.get(path), st = npcSuit ? await loadType(npcSuit).catch(() => null) : null;
   const abilities = (st?.data.AbilityTypes || []).filter((a) => typeof a === "string" && a).map((a) => relTo(st.origin.AbilityTypes || npcSuit, a));
-  return { kind: "suit", isNew: true, path, target: "/Lotus/Powersuits/Custom/" + tail(path).replace(/Avatar$/, "") + "Suit", mesh: relTo(t.origin.Mesh || path, d.Mesh), mats, decos, abilities, abilityCount: abilities.length, hasStore: false, look: null, tag: "", name, icon: d.Icon || "" };
+  const name = stripTags(loc(d.LocTag) || (linked && loc(st?.data.LocalizeTag)) || tail(path).replace(/Avatar$/, ""));
+  return { kind: "suit", isNew: true, enemy: !linked, path, target: "/Lotus/Powersuits/Custom/" + tail(path).replace(/Avatar$/, "") + "Suit", mesh: relTo(t.origin.Mesh || path, d.Mesh), mats, decos, abilities, abilityCount: abilities.length, hasStore: false, look: null, tag: "", name, icon: d.Icon || "" };
 }
 async function analyzeAvatarSuit(path) {
   const t = await loadType(path);
@@ -1584,6 +1584,7 @@ async function analyzeAvatarSuit(path) {
   const suit = await avatarSuitPath(t, path);
   if (!suit && t.data.Mesh && extended()) return newSuitInfo(t, path);
   if (!suit) return { error: T.noSuit };
+  if (!suit.startsWith("/Lotus/Powersuits/")) return newSuitInfo(t, path, suit);
   const st = await loadType(suit);
   if (!st) return { error: fmt(T.pathNotFound, suit) };
   const parent = st.parents[0];
@@ -1607,7 +1608,7 @@ function drawAvatarSuitForm() {
   $("#skin-form").replaceChildren(...[
     field(T.name, text("name")), field(T.description, text("desc")),
     h("p", { class: "muted small" }, info.abilityCount ? fmt(T.suitAdds, info.name, info.abilityCount === 1 ? T.oneAbility : fmt(T.countAbilities, info.abilityCount)) : fmt(T.suitAddsNoAbilities, info.name)),
-    info.isNew ? h("p", { class: "muted small" }, atob("RVhQRVJJTUVOVEFMOiBhbGwgbW9kZWxzIHdpbGwgc2hvdyBpbiBnYW1lIGJ1dCBub3QgYWxsIG9mIHRoZW0gd2lsbCBmaXQgc3RhbmRhcmQgV2FyZnJhbWUgcHJvcG9ydGlvbnMu")) : null,
+    info.enemy ? h("p", { class: "muted small" }, atob("RVhQRVJJTUVOVEFMOiBhbGwgbW9kZWxzIHdpbGwgc2hvdyBpbiBnYW1lIGJ1dCBub3QgYWxsIG9mIHRoZW0gd2lsbCBmaXQgc3RhbmRhcmQgV2FyZnJhbWUgcHJvcG9ydGlvbnMu")) : null,
     info.look ? h("label", { class: "check" }, lookBox, h("span", {}, T.useLook)) : null].filter(Boolean));
 }
 function buildAvatarSuit() {
