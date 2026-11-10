@@ -1,9 +1,10 @@
 const PLAYABLE = [
   { path: "/Lotus/Powersuits/Stalker/Stalker", tag: "/Lotus/Language/Game/Stalker" },
   { path: "/Lotus/Types/Friendly/PlayerControllable/ControllableTeshinAvatar", tag: "/Lotus/Language/Game/Teshin" },
-  { path: "/Lotus/Types/Friendly/PlayerControllable/ControllableCorpusTennoAvatar", tag: "/Lotus/Language/Game/RifleSpaceMan" },
-  { path: "/Lotus/Types/Friendly/PlayerControllable/ControllableGrineerTennoAvatar", tag: "/Lotus/Language/Enemies/EidolonGrineerLancerRifle" },
-  { path: "/Lotus/Levels/KahlMissions/KahlTypes/ControllableKahlTennoAvatar", tag: "" },
+  { path: "/Lotus/Types/Friendly/PlayerControllable/ControllableCorpusTennoAvatar", tag: "", name: "Veso" },
+  { path: "/Lotus/Types/Friendly/PlayerControllable/TnwControllableGrineerTennoAvatar", tag: "", name: "Kahl (TNW)" },
+  { path: "/Lotus/Levels/KahlMissions/KahlTypes/ControllableKahlTennoAvatar", tag: "", name: "Kahl (Veilbreaker)" },
   { path: "/Lotus/Powersuits/Excalibur/DarkExcalibur", tag: "/Lotus/Language/Changyou/DarkExcaliburName", name: "Dark Excalibur Prime" },
-  { path: "/Lotus/Powersuits/Wraith/SevagothShadowPrime", tag: "/Lotus/Language/Primes/SevagothShadowPrimeName", name: "Sevagoth Prime's Shadow" },
+  { path: "/Lotus/Types/Friendly/PlayerControllable/ControllableDrifterTennoAvatar", tag: "/Lotus/Language/Labels/NewWarOperatorAdult", name: "TNW Drifter" },
+  { path: "/Lotus/Types/Friendly/PlayerControllable/ControllableDuviriDrifterTennoAvatar", tag: "", name: "Duviri Drifter" },
 ];

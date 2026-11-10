@@ -53,6 +53,7 @@
   </header>
   <form class="eye-inner" id="eye-form">
     <div class="path-w"><input class="input" id="eye-path" data-text-placeholder="searchOrPaste" placeholder="Search by name or paste a path, e.g. /Lotus/Powersuits/Stalker/Stalker" spellcheck="false" autocomplete="off"></div>
+    <div class="eye-batch" id="eye-batch" hidden></div>
     <div class="eye-choices" id="eye-choices" hidden>
     <div class="eye-target" id="eye-target" hidden></div>
     <span class="label eye-question" data-text="sentientQuestion">What would you like to do?</span>
@@ -67,7 +68,7 @@
       <label class="label" for="eye-newpath" data-text="newItemPath">New item path</label>
       <input class="input" id="eye-newpath" placeholder="/Lotus/Upgrades/Skins/Excalibur/MyNewSkin" spellcheck="false" autocomplete="off">
     </div>
-    <div class="eye-actions"><button class="btn btn-primary start" type="submit" data-text="continue">Continue</button></div>
+    <div class="eye-actions"><button class="btn btn-primary start" type="submit" data-text="continue">Continue</button><button class="btn btn-ghost" type="button" id="eye-add" data-text="batchAdd" hidden>Add to selection</button></div>
     </div>
     <span class="muted small" id="eye-status"></span>
   </form>

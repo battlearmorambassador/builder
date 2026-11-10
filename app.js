@@ -1528,8 +1528,14 @@ function pathSearch(input, load) {
   const box = h("div", { class: "sugg path-sugg", hidden: true });
   input.after(box);
   const list = suggestBox(input, box);
-  let data = null, search = 0;
+  let data = null, search = 0, ranked = [], shown = 0;
   const choose = (i) => { search++; input.value = i.name; list.close(); input.dispatchEvent(new Event("change")); };
+  const row = (i) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); choose(i); } }, h("span", { class: "pn" }, i.shown || i.name, i.flag ? flagIcon(i.flag) : null), h("span", { class: "pp" }, i.path.replace(/^\/Lotus\//, "")));
+  const draw = (count) => { const top = box.scrollTop; shown = Math.min(count, ranked.length); list.show(ranked.slice(0, shown).map(row)); box.scrollTop = top; };
+  box.addEventListener("wheel", (e) => {
+    if (e.deltaY <= 0 || shown >= ranked.length) return;
+    if (box.scrollTop + box.clientHeight >= box.scrollHeight - 2) draw(shown + 12);
+  }, { passive: true });
   input.addEventListener("focus", async () => { data ||= await load(); });
   input.addEventListener("input", debounce(async () => {
     const id = ++search, q = input.value.trim().toLowerCase();
@@ -1539,17 +1545,27 @@ function pathSearch(input, load) {
       const n = i.name.toLowerCase(), at = n.indexOf(q);
       const rank = n === q ? 0 : at === 0 ? 1 : at > 0 ? 2 : (i.path + " " + (i.shown || "")).toLowerCase().includes(q) ? 3 : -1;
       return [rank, i];
-    }).filter(([r]) => r >= 0).sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length).slice(0, 12);
-    const done = hits.length === 1 && [hits[0][1].name.toLowerCase(), hits[0][1].path.toLowerCase()].includes(q);
-    list.show((done ? [] : hits).map(([, i]) => h("button", { type: "button", onmousedown: (e) => { e.preventDefault(); choose(i); } }, h("span", { class: "pn" }, i.shown || i.name, i.flag ? flagIcon(i.flag) : null), h("span", { class: "pp" }, i.path.replace(/^\/Lotus\//, "")))));
+    }).filter(([r]) => r >= 0).sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length).map(([, i]) => i);
+    const done = hits.length === 1 && [hits[0].name.toLowerCase(), hits[0].path.toLowerCase()].includes(q);
+    ranked = done ? [] : hits;
+    box.scrollTop = 0;
+    draw(12);
   }, 120));
 }
 async function avatarSuitPath(t, path) {
   const inv = t.data.InventoryControllerType;
-  if (typeof inv !== "string") return null;
-  const it = await loadType(relTo(t.origin.InventoryControllerType || path, inv));
-  const list = (it?.data.DefaultInv || []).map((x) => relTo(it.origin.DefaultInv, x));
-  return list.find((x) => /^\/Lotus\/Powersuits\/|\/[^/]*Suit$/.test(x)) || null;
+  if (typeof inv === "string") {
+    const it = await loadType(relTo(t.origin.InventoryControllerType || path, inv));
+    const list = (it?.data.DefaultInv || []).map((x) => relTo(it.origin.DefaultInv, x));
+    const found = list.find((x) => /^\/Lotus\/Powersuits\/|\/[^/]*Suit$/.test(x));
+    if (found) return found;
+  }
+  const stem = path.replace(/(Tenno)?Avatar$/, "");
+  for (const p of [stem + "Suit", stem + "SuitRemaster"]) {
+    const st = await loadType(p).catch(() => null);
+    if (st && [p, ...st.parents].some((x) => /PowerSuits\/PlayerPowerSuit$/.test(x))) return p;
+  }
+  return null;
 }
 const POWER_SUIT_STORE = "/Lotus/Types/Game/StoreItemSpecializations/PowerSuitStoreItem";
 async function avatarLook(t, path, own, target) {
@@ -1570,14 +1586,17 @@ const FLAG = atob("ZW5lbXlTdWl0cw==");
 const extended = () => store.get(FLAG) === true;
 const SUIT_BASE = "/Lotus/Types/Game/PowerSuits/PlayerPowerSuit";
 const visual = (c) => !/Spawner|Trigger|Handler/i.test(tail(c.Type));
-async function avatarDecos(t, path) {
+async function avatarDecos(t, path, bodyMesh = t.data.Mesh, headGiven = false) {
   const list = (x, at) => (x.data.AutoSimChildren || []).map((c) => ({ ...c, Type: relTo(x.origin.AutoSimChildren || at, c.Type) })).filter((c) => !isFx(c.Type));
-  const folder = (p) => String(p).replace(/[^/]*$/, ""), body = folder(t.data.Mesh);
-  const own = list(t, path).filter(visual), seen = new Set(own.map((c) => c.Type));
+  const file = (p) => tail(String(p || "")).toLowerCase(), folder = (p) => String(p).replace(/[^/]*$/, ""), body = folder(t.data.Mesh);
+  const meshOf = async (type) => { const x = await loadType(type).catch(() => null); return x?.data.Mesh ? file(x.data.Mesh) : ""; };
+  const own = [];
+  for (const c of list(t, path).filter(visual)) if (!bodyMesh || (await meshOf(c.Type)) !== file(bodyMesh)) own.push(c);
+  const seen = new Set(own.map((c) => c.Type)), hasHead = headGiven || /head/i.test(file(bodyMesh)) || own.some((c) => /Head|Helmet|Mask/i.test(tail(c.Type)));
   const head = t.data.FacialMorphHeadAttachmentType;
-  if (typeof head === "string" && head) {
+  if (typeof head === "string" && head && !hasHead && t.origin.FacialMorphHeadAttachmentType === t.origin.Mesh) {
     const type = relTo(t.origin.FacialMorphHeadAttachmentType || path, head);
-    if (!seen.has(type) && folder(type) === body) { seen.add(type); own.push({ LocalPosition: [0, 0, 0], LocalRotation: [0, 0, 0, 1], BoneName: "", Type: type, Chance: 255, RelativeToBounds: 0, Attach: 1, DestroyWithOwner: 1, DestroyParentOnDeath: 0, FadeOutOnDestruction: 0, Scale: 1 }); }
+    if (!seen.has(type)) { seen.add(type); own.push({ LocalPosition: [0, 0, 0], LocalRotation: [0, 0, 0, 1], BoneName: "", Type: type, Chance: 255, RelativeToBounds: 0, Attach: 1, DestroyWithOwner: 1, DestroyParentOnDeath: 0, FadeOutOnDestruction: 0, Scale: 1 }); }
   }
   for (const parent of t.parents) {
     const p = await loadType(parent).catch(() => null);
@@ -1653,11 +1672,32 @@ function abilityEditor() {
 async function newSuitInfo(t, path, linked = null) {
   const d = t.data, key = d.OverrideMaterials ? "OverrideMaterials" : "OverrideMaterial";
   const mats = [].concat(d[key] || []).map((m) => relTo(t.origin[key] || path, m));
-  const decos = await avatarDecos(t, path);
   const chars = await loadCharacters(), npcSuit = linked || chars.npcSuit.get(path), st = npcSuit ? await loadType(npcSuit).catch(() => null) : null;
+  let parentMesh = linked && st?.data.Mesh ? relTo(st.origin.Mesh || linked, st.data.Mesh) : "";
+  let parentSlots = linked && st?.data.DefaultCustomization ? { ...st.data.DefaultCustomization } : null;
+  const extraDecos = [];
+  if (parentMesh && /head/i.test(tail(parentMesh)) && d.Mesh) {
+    const headType = parentMesh.replace(/(_skel)?\.fbx$/i, "Deco");
+    if (await loadType(headType).catch(() => null)) { extraDecos.push({ LocalPosition: [0, 0, 0], LocalRotation: [0, 0, 0, 1], BoneName: "", Type: headType, Chance: 255, RelativeToBounds: 0, Attach: 1, DestroyWithOwner: 1, DestroyParentOnDeath: 0, FadeOutOnDestruction: 0, Scale: 1 }); parentMesh = ""; }
+  }
+  if (parentSlots) for (const [slot, v] of Object.entries(parentSlots)) {
+    const item = typeof v === "string" ? v : v?.ItemType;
+    if (!slot.startsWith("TOSS_") || !item) continue;
+    const it = await loadType(item).catch(() => null);
+    const hands = Object.values(it?.data.GraphicsOverrides || {}).map((g) => g?.THIRD_PERSON_Attachment?.UpgradeAutoChildren || []).filter((l) => l.some((c) => c.Type));
+    const own = (it?.data.THIRD_PERSON_Attachment?.UpgradeAutoChildren || []).filter((c) => c.Type);
+    const picked = own.length ? own : hands.find((l) => l.some((c) => /Closed/.test(c.Type))) || hands.find((l) => l.some((c) => /Male/.test(c.Type) && !/Female/.test(c.Type))) || hands[0] || [];
+    const kids = picked.filter((c) => c.Type).map((c) => ({ ...c, Type: relTo(it.origin.THIRD_PERSON_Attachment || it.origin.GraphicsOverrides || item, c.Type), ...(slot === "TOSS_HOOD" ? { forceAux: true } : {}) }));
+    if (!kids.length) continue;
+    extraDecos.push(...kids);
+    parentSlots[slot] = { ...(typeof v === "object" ? v : {}), ItemType: "" };
+  }
+  const usesOperatorSlots = !!parentSlots && Object.keys(parentSlots).some((k) => k.startsWith("TOSS_"));
+  if (usesOperatorSlots) parentSlots = null;
+  const decos = [...extraDecos, ...(await avatarDecos(t, path, parentMesh || d.Mesh, extraDecos.some((c) => /Head|Helmet|Mask/i.test(tail(c.Type)))))];
   const abilities = (st?.data.AbilityTypes || []).filter((a) => typeof a === "string" && a).map((a) => relTo(st.origin.AbilityTypes || npcSuit, a));
-  const name = stripTags(loc(d.LocTag) || (linked && loc(st?.data.LocalizeTag)) || tail(path).replace(/Avatar$/, ""));
-  return { kind: "suit", isNew: true, enemy: !linked, path, target: "/Lotus/Powersuits/Custom/" + tail(path).replace(/Avatar$/, "") + "Suit", mesh: relTo(t.origin.Mesh || path, d.Mesh), mats, decos, abilities, ownAbilities: [], abilityCount: abilities.length, hasStore: false, look: null, tag: "", name, icon: chars.portraits.get(name.toLowerCase()) || chars.all.find((c) => c.path === path)?.icon || chars.all.find((c) => c.name === name && c.icon)?.icon || "" };
+  const name = stripTags(PLAYABLE.find((c) => c.path === path)?.name || loc(d.LocTag) || (linked && loc(st?.data.LocalizeTag)) || tail(path).replace(/Avatar$/, ""));
+  return { kind: "suit", isNew: true, enemy: !linked, animController: linked && typeof d.AnimControllerType === "string" ? relTo(t.origin.AnimControllerType || path, d.AnimControllerType) : "", base: (!usesOperatorSlots && linked) || SUIT_BASE, parentMesh, parentSlots, path, target: "/Lotus/Powersuits/Custom/" + tail(path).replace(/Avatar$/, "") + "Suit", mesh: relTo(t.origin.Mesh || path, d.Mesh), mats, decos, abilities, ownAbilities: [], abilityCount: abilities.length, hasStore: false, look: null, tag: "", name, icon: chars.portraits.get(name.toLowerCase()) || (/LargePortraits\//.test(st?.data.MiniMapLargeIcon || "") ? relTo(st.origin.MiniMapLargeIcon || npcSuit, st.data.MiniMapLargeIcon) : "") || chars.all.find((c) => c.path === path)?.icon || chars.all.find((c) => c.name === name && c.icon)?.icon || "" };
 }
 async function analyzeAvatarSuit(path) {
   const t = await loadType(path);
@@ -1723,15 +1763,33 @@ function abilityDescLines() {
   });
 }
 function buildAvatarSuit() {
-  const info = sk.info, store = toStorePath(info.target), name = sk.name.trim() || info.name, desc = sk.desc.trim();
+  const info = sk.info, name = sk.name.trim() || info.name, desc = sk.desc.trim();
+  const key = info.isNew ? name.replace(/[^A-Za-z0-9]/g, "") || tail(info.target).replace(/Suit$/, "") : "";
+  const target = info.isNew ? "/Lotus/Powersuits/Custom/" + key + "Suit" : info.target, store = toStorePath(target);
   const out = ["# " + name, "$if can_add_new_types()"];
-  const icon = info.icon && ["Icon", info.icon], decos = (info.decos || []).filter(decoOn).map(({ optional, ...c }) => c);
-  const helmet = info.isNew && decos.length ? "/Lotus/Upgrades/Skins/Custom/" + tail(info.target).replace(/Suit$/, "") + "Attachments" : "", helmetName = name + " " + T.attachments;
-  if (helmet) out.push(...skinBlock(`+${helmet}|/Lotus/Types/Game/LotusWarframeCustomization`, [["LocalizeTag", helmetName], icon, ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["Weapon", info.target], ["GenericCompatible", info.target], ["CompatibleSlots", ["Face"]], ["THIRD_PERSON_Attachment", { UpgradeAutoChildren: decos }]]), "");
-  if (helmet) out.push(...skinBlock(`+${toStorePath(helmet)}|${CUSTOMIZATION_STORE}`, [["ProductCategory", "WeaponSkins"], ["LocalizeTag", helmetName], icon, ["TypeName", helmet], ["Compatible", info.target], ["AlwaysAvailable", 1], ["ShowInMarket", 1], ["RegularPrice", 1], ["Giftable", 0], ["AvailableOnPvp", 1], ["CompatibleSlots", ["Face"]]]), "");
-  if (info.isNew) out.push(...skinBlock(`+${info.target}|${SUIT_BASE}`, [["LocalizeTag", name], desc && ["LocalizeDescTag", desc], icon, ["MarketMode", "MM_VISIBLE"], ["Mesh", info.mesh], info.mats.length && ["OverrideMaterials", info.mats], sk.abilities.length && ["AbilityTypes", sk.abilities], helmet && ["DefaultCustomization", { Face: { ItemType: helmet } }]]), "");
-  if (!info.hasStore) out.push(...skinBlock(`+${store}|${POWER_SUIT_STORE}`, [["ProductCategory", "Suits"], ["LocalizeTag", name], desc && ["LocalizeDescTag", desc], icon, ["TypeName", info.target], ["ShowInMarket", 1], ["RegularPrice", 1]]), "");
-  out.push(">" + MANIFEST, indent("a|StoreItems|" + store), ...(helmet ? [indent("a|StoreItems|" + toStorePath(helmet))] : []), "$endif", "");
+  const icon = info.icon && ["Icon", info.icon], decos = info.isNew ? (info.decos || []).filter(decoOn) : [];
+  const isHead = (c) => /Head|Helmet|Mask/i.test(tail(c.Type));
+  const taken = (slot) => { const v = info.parentSlots?.[slot]; return !!(v && (typeof v === "string" ? v : v.ItemType)); };
+  const clean = ({ optional, forceAux, ...c }) => c;
+  const head = taken("Helmet") ? [] : decos.filter((c) => isHead(c) && !c.forceAux).map(clean), aux = taken("Face") ? [] : decos.filter((c) => c.forceAux || (!isHead(c) && c.BoneName)).map(clean);
+  const bodyDecos = decos.filter((c) => !c.forceAux && !c.BoneName && (!isHead(c) || taken("Helmet"))).map(clean);
+  const owned = (path, label, slot, fields) => {
+    out.push(...skinBlock(`+${path}|${CUSTOMIZATION}`, [["LocalizeTag", label], icon, ["AlwaysAvailable", 1], ["AvailableOnPvp", 1], ["MarketMode", "MM_VISIBLE"], ["RegularPrice", 1], ["Weapon", target], ["GenericCompatible", target], slot && ["CompatibleSlots", [slot]], ...fields]), "");
+    out.push(...skinBlock(`+${toStorePath(path)}|${CUSTOMIZATION_STORE}`, [["ProductCategory", "WeaponSkins"], ["LocalizeTag", label], icon, ["TypeName", path], ["Compatible", target], ["AlwaysAvailable", 1], ["ShowInMarket", 1], ["RegularPrice", 1], ["Giftable", 0], ["AvailableOnPvp", 1], slot && ["CompatibleSlots", [slot]]]), "");
+    return path;
+  };
+  const defaults = {}, extras = [];
+  if (head.length) extras.push(defaults.Helmet = { ItemType: owned(SKIN_DIR + key + "Helmet", fmt(T.nameHelmet, name), "", [["THIRD_PERSON_Attachment", { UpgradeAutoChildren: head }]]) });
+  if (bodyDecos.length || info.animController) {
+    const variant = SKIN_DIR + key + "BodyVariant";
+    out.push(...skinBlock(`+${variant}|/EE/Types/Game/WeaponSkin`, [["TpMeshOverride", info.parentMesh || info.mesh], !info.parentMesh && info.mats.length && ["TpMaterialOverrides", info.mats]]), "");
+    extras.push(defaults.BodySkin = { ItemType: owned(SKIN_DIR + key + "Body", fmt(T.nameSkin, name), "BodySkin", [["UpgradeSkinOverride", variant], info.animController && ["AnimController", info.animController], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", bodyDecos]]) });
+  }
+  if (aux.length) extras.push(defaults.Face = { ItemType: owned(SKIN_DIR + key + "Attachments", name + " " + T.attachments, "Face", [["THIRD_PERSON_Attachment", { UpgradeAutoChildren: aux }]]) });
+  const slots = extras.length ? { ...(info.parentSlots || {}), ...defaults } : null;
+  if (info.isNew) out.push(...skinBlock(`+${target}|${info.base || SUIT_BASE}`, [["LocalizeTag", name], desc && ["LocalizeDescTag", desc], icon, ["MarketMode", "MM_VISIBLE"], !info.parentMesh && ["Mesh", info.mesh], !info.parentMesh && info.mats.length && ["OverrideMaterials", info.mats], sk.abilities.length && ["AbilityTypes", sk.abilities], slots && ["DefaultCustomization", slots]]), "");
+  if (!info.hasStore) out.push(...skinBlock(`+${store}|${POWER_SUIT_STORE}`, [["ProductCategory", "Suits"], ["LocalizeTag", name], desc && ["LocalizeDescTag", desc], icon, ["TypeName", target], ["ShowInMarket", 1], ["RegularPrice", 1]]), "");
+  out.push(">" + MANIFEST, indent("a|StoreItems|" + store), ...extras.map((x) => indent("a|StoreItems|" + toStorePath(x.ItemType))), "$endif", "");
   out.push(...abilityDescLines());
   if (info.isNew) return out.join("\n") + "\n";
   const texts = [indent("LocalizeTag=" + eeStr(name)), ...(desc ? [indent("LocalizeDescTag=" + eeStr(desc))] : [])];
@@ -1770,8 +1828,54 @@ function initEye() {
   const radio = (v) => $(`input[name="eye-mode"][value="${v}"]`);
   const showMode = (v, on) => { radio(v).disabled = !on; radio(v).closest("label").hidden = !on; };
   let checkId = 0, lastItem = "";
+  const batch = [];
+  const pickFirst = () => {
+    const current = document.querySelector('input[name="eye-mode"]:checked');
+    if (!current || current.disabled) { const first = document.querySelector('input[name="eye-mode"]:not(:disabled)'); if (first) first.checked = true; }
+  };
+  const batchModes = (kind) => {
+    const suit = batch.every((b) => b.kind.suit) && (!kind || !!kind.suit), skin = batch.every((b) => b.kind.skin) && (!kind || kind.skin);
+    showMode("asis", false); showMode("new", false); showMode("suit", suit); showMode("skin", skin);
+    $("#eye-new").hidden = true;
+    pickFirst();
+  };
+  const drawBatch = () => {
+    $("#eye-batch").hidden = !batch.length;
+    $("#eye-batch").replaceChildren(...batch.map((b, i) => h("span", { class: "eye-chip" }, b.name, h("button", { type: "button", title: T.remove, onclick: () => { batch.splice(i, 1); drawBatch(); checkItem(); } }, "✕"))));
+  };
+  $("#eye-add").onclick = async () => {
+    const p = resolve();
+    if (!p || batch.some((b) => b.path === p)) return;
+    const kind = await itemKind(p).catch(() => null);
+    if (!kind || !(kind.suit || kind.skin)) return;
+    batch.push({ path: p, name: input.value.trim() || tail(p), kind });
+    input.value = "";
+    drawBatch();
+    checkItem();
+  };
+  const runBatch = async () => {
+    const m = mode();
+    if (m !== "suit" && m !== "skin") return;
+    const list = [...batch], p = resolve();
+    if (p && input.value.trim() && !list.some((b) => b.path === p)) list.push({ path: p, name: input.value.trim() });
+    const files = [], failed = [], used = new Set();
+    for (let i = 0; i < list.length; i++) {
+      status.innerHTML = '<span class="spinner"></span>' + esc(fmt(T.batchBuilding, i + 1, list.length));
+      await showSkin(list[i].path, m === "suit").catch(() => null);
+      if (!sk?.info) { failed.push(list[i].name); continue; }
+      const base = (sk.name.trim() || sk.info.name || tail(list[i].path)).replace(/[\\/:*?"<>|]/g, "").trim() || "Patch";
+      let file = base + ".txt", n = 2;
+      while (used.has(file.toLowerCase())) file = base + " " + n++ + ".txt";
+      used.add(file.toLowerCase());
+      files.push({ path: file, text: buildSkin() });
+    }
+    if (files.length) saveBlob(T.sentientBuilder + ".zip", zipFiles(files));
+    status.textContent = fmt(T.batchDone, files.length) + (failed.length ? " " + fmt(T.batchSkipped, failed.join(", ")) : "");
+  };
   const checkItem = async () => {
     const id = ++checkId, p = resolve();
+    if (!input.value.trim() && batch.length) { checkId++; status.textContent = ""; $("#eye-choices").hidden = false; $("#eye-target").hidden = true; $("#eye-note").hidden = true; $("#eye-add").hidden = true; batchModes(null); return; }
+    $("#eye-add").hidden = true;
     status.textContent = "";
     if (p) status.innerHTML = '<span class="spinner"></span>' + fmt(T.lookingUp, esc(p));
     let kind = null, failed = false;
@@ -1794,6 +1898,8 @@ function initEye() {
       if (first) first.checked = true;
     }
     lastItem = p;
+    $("#eye-add").hidden = !(kind.suit || kind.skin);
+    if (batch.length) batchModes(kind);
     if (!document.querySelector('input[name="eye-mode"]:not(:disabled)')) { $("#eye-choices").hidden = true; status.textContent = T.notAddable; return; }
     $("#eye-new").hidden = mode() !== "new";
     suggest();
@@ -1814,6 +1920,7 @@ function initEye() {
   np.addEventListener("input", () => (np.dataset.auto = ""));
   $("#eye-form").onsubmit = async (e) => {
     e.preventDefault();
+    if (batch.length) { runBatch(); return; }
     const target = resolve();
     if (!target) return;
     if ($("#eye-choices").hidden) { checkItem(); return; }
