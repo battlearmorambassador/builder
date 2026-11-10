@@ -54,6 +54,12 @@ async function avatarDecos(t, path, bodyMesh = t.data.Mesh, headGiven = false) {
 }
 const decoOn = (c, i) => !!c.optional === sk.decoOff.has(i);
 const DUMMY_ABILITY = "/Lotus/Powersuits/NpcPowersuits/NpcPowersuitAbilities/DummyAbility";
+const trimEmpty = (list) => { const out = [...list]; while (out.length && out[out.length - 1] === DUMMY_ABILITY) out.pop(); return out; };
+const abilityList = () => { const list = trimEmpty(sk.abilities); while (list.length < 4) list.push(DUMMY_ABILITY); return list; };
+const EMPTY_ICON = "/Lotus/Interface/Graphics/OperatorHud/Empty.png";
+const emptyAbility = (target) => target.replace(/Suit$/, "") + "EmptyAbility";
+const abilityTypes = (target) => abilityList().map((a) => (a === DUMMY_ABILITY ? emptyAbility(target) : a));
+const abilityRanks = () => [0, 1, 2, 3].map((i) => ({ RankLevels: [abilityList()[i] && abilityList()[i] !== DUMMY_ABILITY ? 0 : 99] }));
 const abilityMeta = new Map();
 function loadAbilityMeta(path) {
   if (!abilityMeta.has(path)) abilityMeta.set(path, loadType(path).then((a) => {
@@ -141,7 +147,7 @@ async function newSuitInfo(t, path, linked = null) {
   const usesOperatorSlots = !!parentSlots && Object.keys(parentSlots).some((k) => k.startsWith("TOSS_"));
   if (usesOperatorSlots) parentSlots = null;
   const decos = [...extraDecos, ...(await avatarDecos(t, path, parentMesh || d.Mesh, extraDecos.some(isHeadPart)))];
-  const abilities = (st?.data.AbilityTypes || []).filter((a) => typeof a === "string" && a).map((a) => relTo(st.origin.AbilityTypes || npcSuit, a));
+  const abilities = trimEmpty((st?.data.AbilityTypes || []).filter((a) => typeof a === "string").map((a) => (a ? relTo(st.origin.AbilityTypes || npcSuit, a) : DUMMY_ABILITY)));
   const name = stripTags(PLAYABLE.find((c) => c.path === path)?.name || loc(d.LocTag) || (linked && loc(st?.data.LocalizeTag)) || tail(path).replace(/Avatar$/, ""));
   const info = { kind: "suit", isNew: true, enemy: !linked, base: (!usesOperatorSlots && linked) || SUIT_BASE, parentMesh, parentSlots, path, target: "/Lotus/Powersuits/Custom/" + tail(path).replace(/Avatar$/, "") + "Suit", mesh: relTo(t.origin.Mesh || path, d.Mesh), mats, decos, abilities, ownAbilities: [], abilityCount: abilities.length, hasStore: false, look: null, tag: "", name, icon: chars.portraits.get(name.toLowerCase()) || (/LargePortraits\//.test(st?.data.MiniMapLargeIcon || "") ? relTo(st.origin.MiniMapLargeIcon || npcSuit, st.data.MiniMapLargeIcon) : "") || chars.all.find((c) => c.path === path)?.icon || chars.all.find((c) => c.name === name && c.icon)?.icon || "" };
   info.baseSlots = (await loadType(info.base))?.data.DefaultCustomization || {};
@@ -159,7 +165,7 @@ async function analyzeAvatarSuit(path) {
   const parent = st.parents[0];
   const target = parent?.startsWith("/Lotus/Powersuits/") && !/BaseSuit$/.test(parent) ? parent : suit;
   const own = target === suit ? st : await loadType(target);
-  const full = (d, o) => (Array.isArray(d.AbilityTypes) ? d.AbilityTypes : []).map((a) => relTo(o.AbilityTypes || target, a));
+  const full = (d, o) => trimEmpty((Array.isArray(d.AbilityTypes) ? d.AbilityTypes : []).map((a) => (a ? relTo(o.AbilityTypes || target, a) : DUMMY_ABILITY)));
   const abilities = full(st.data, st.origin), wanted = deepEq(abilities, full(own.data, own.origin)) ? [] : abilities;
   const hasStore = !!(await loadType(toStorePath(target)).catch(() => null)), chars = await loadCharacters();
   const look = await avatarLook(t, path, own, target);
@@ -219,6 +225,8 @@ function buildAvatarSuit() {
   const key = info.isNew ? name.replace(/[^A-Za-z0-9]/g, "") || tail(info.target).replace(/Suit$/, "") : "";
   const target = info.isNew ? "/Lotus/Powersuits/Custom/" + key + "Suit" : info.target, store = toStorePath(target);
   const out = ["# " + name, "$if can_add_new_types()"];
+  const writesAbilities = info.isNew || !deepEq(abilityTypes(info.target), info.ownAbilities);
+  if (writesAbilities && abilityList().includes(DUMMY_ABILITY)) out.push(...skinBlock(`+${emptyAbility(target)}|${DUMMY_ABILITY}`, [["Icon", EMPTY_ICON]]), "");
   const icon = info.icon && ["Icon", info.icon], decos = info.isNew ? (info.decos || []).map((c, i) => ({ ...c, place: sk.decoPlace?.get(i) || "" })).filter((c, i) => decoOn(info.decos[i], i)) : [];
   const isHead = isHeadPart;
   const taken = (slot) => { const v = info.parentSlots?.[slot]; return !!(v && (typeof v === "string" ? v : v.ItemType)); };
@@ -245,7 +253,7 @@ function buildAvatarSuit() {
   }
   if (aux.length) extras.push(defaults.Face = { ItemType: owned(SKIN_DIR + key + "Attachments", name + " " + T.attachments, "Face", [["THIRD_PERSON_Attachment", { UpgradeAutoChildren: aux }]]) });
   const slots = armourFit({ ...info.baseSlots, ...(info.parentSlots || {}), ...defaults }, [info.mesh, info.parentMesh, info.base, info.path]);
-  if (info.isNew) out.push(...skinBlock(`+${target}|${info.base || SUIT_BASE}`, [["LocalizeTag", name], desc && ["LocalizeDescTag", desc], icon, ["MarketMode", "MM_VISIBLE"], !info.parentMesh && ["Mesh", info.mesh], !info.parentMesh && info.mats.length && ["OverrideMaterials", info.mats], sk.abilities.length && ["AbilityTypes", sk.abilities], slots && ["DefaultCustomization", slots]]), "");
+  if (info.isNew) out.push(...skinBlock(`+${target}|${info.base || SUIT_BASE}`, [["LocalizeTag", name], desc && ["LocalizeDescTag", desc], icon, ["MarketMode", "MM_VISIBLE"], !info.parentMesh && ["Mesh", info.mesh], !info.parentMesh && info.mats.length && ["OverrideMaterials", info.mats], ["AbilityTypes", abilityTypes(target)], ["AbilityRanks", abilityRanks()], slots && ["DefaultCustomization", slots]]), "");
   if (!info.hasStore) out.push(...skinBlock(`+${store}|${POWER_SUIT_STORE}`, [["ProductCategory", "Suits"], ["LocalizeTag", name], desc && ["LocalizeDescTag", desc], icon, ["TypeName", target], ["ShowInMarket", 1], ["RegularPrice", 1]]), "");
   out.push(">" + MANIFEST, indent("a|StoreItems|" + store), ...extras.map((x) => indent("a|StoreItems|" + toStorePath(x.ItemType))), "$endif", "");
   out.push(...abilityDescLines());
@@ -253,7 +261,7 @@ function buildAvatarSuit() {
   const texts = [indent("LocalizeTag=" + eeStr(name)), ...(desc ? [indent("LocalizeDescTag=" + eeStr(desc))] : [])];
   if (info.hasStore) out.push(">" + store, indent("ShowInMarket=1"), indent("RegularPrice=1"), ...texts, "");
   out.push(">" + info.target, indent("MarketMode=MM_VISIBLE"), ...texts);
-  if (!deepEq(sk.abilities, info.ownAbilities)) out.push(indent("AbilityTypes={" + sk.abilities.join(",") + "}"));
+  if (!deepEq(abilityTypes(info.target), info.ownAbilities)) out.push(indent("AbilityTypes=" + eeInline(abilityTypes(info.target))), indent("AbilityRanks=" + eeValue(abilityRanks())));
   const look = sk.useLook && info.look;
   if (look?.meshItem) out.push("", ...skinBlock(">" + look.meshItem, [["TpMeshOverride", look.mesh]]));
   if (look?.body.length) out.push("", ...skinBlock(">" + look.skin, [["OverrideAttachedFx", 1], ["AttachedFxOverrides", look.body]]));
