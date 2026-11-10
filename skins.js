@@ -12,7 +12,9 @@ async function analyzeCharacter(path) {
     head = itemParts(await loadType(hp), hp);
   }
   if (!head.length) head = children.filter(isHeadPart);
-  const parts = children.filter((c) => !head.includes(c));
+  const bodyFile = tail(String(d.Mesh)).toLowerCase();
+  const dupes = await Promise.all(children.map(async (c) => !c.BoneName && tail(String((await loadType(c.Type).catch(() => null))?.data.Mesh || "")).toLowerCase() === bodyFile));
+  const parts = children.filter((c, i) => !head.includes(c) && !dupes[i]);
   const color = d.DefaultEnergyColor || d.ScriptInstance?._newEnergyColor || null;
   const scriptColor = !d.DefaultEnergyColor && !!d.ScriptInstance?._newEnergyColor;
   let fix = null, note = "";
@@ -26,7 +28,7 @@ async function analyzeCharacter(path) {
     }
   }
   const name = loc(d.LocalizeTag) || loc(d.LocTag) || tail(path);
-  return { path, name: stripTags(name), icon: d.Icon || "", mesh: d.Mesh, mats, head, parts, fix, note };
+  return { path, name: stripTags(name), icon: d.Icon || "", mesh: d.Mesh, meshPath: relTo(at("Mesh"), d.Mesh), mats, head, parts, fix, note };
 }
 const WEAPON_ROOTS = { LotusLongGun: T.everyPrimaryWeapon, LotusPistol: T.everySecondaryWeapon, PlayerMeleeWeapon: T.everyMeleeWeapon };
 const WEAPON_SKIN = "/Lotus/Types/Game/LotusWeaponCustomization";
@@ -188,7 +190,7 @@ function buildSkin() {
     blocks.push(customItem({ path: hp, name: helmetName, icon: info.icon, pre: [["ExcludeFromCodex", 0]], who, fields: [["THIRD_PERSON_Attachment", { UpgradeAutoChildren: info.head }]] }));
     blocks.push(skinStore(shp, hp, helmetName, [["ExcludeFromCodex", 0]]));
   }
-  if (body) blocks.push(customItem({ path: sp, name: label, desc: sk.desc.trim(), icon: info.icon, who, fields: [["UpgradeSkinOverride", vp], ["CompatibleSlots", ["BodySkin"]], ["AllowUglyMode", 1], helmet && sk.lockHelmet && ["ForcedCustomizations", { Helmet: hp }], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", info.parts.filter((c, i) => sk.picked.has(i) && !((sk.parts === "split" || sk.parts === "attach") && !isFx(c.Type) && c.BoneName))]] }));
+  if (body) blocks.push(customItem({ path: sp, name: label, desc: sk.desc.trim(), icon: info.icon, who, fields: [["UpgradeSkinOverride", vp], ["CompatibleSlots", ["BodySkin"]], ["AllowUglyMode", 1], helmet && sk.lockHelmet && ["ForcedCustomizations", { Helmet: hp }], ["OverrideAttachedFx", 1], ["AttachedFxOverrides", info.parts.filter((c, i) => sk.picked.has(i) && !((sk.parts === "split" || sk.parts === "attach") && !isFx(c.Type) && c.BoneName))], RIG.bodies[info.meshPath] && ["DefaultCustomizationOverrides", armourFit({}, [info.meshPath])]] }));
   if (body) blocks.push(skinStore(ssp, sp, label, [["CompatibleSlots", ["BodySkin"]]]));
   const extra = sk.parts === "split" || sk.parts === "attach" ? auxBlocks(info.parts.map((c, i) => ({ c, slot: sk.slots.get(i) || "Face" })).filter((p, i) => sk.picked.has(i) && !isFx(p.c.Type) && p.c.BoneName), key, label.replace(/\s*Skin$/i, ""), who, sk.target, info.icon) : { blocks: [], stores: [] };
   blocks.push(...extra.blocks);
