@@ -291,6 +291,7 @@ window.TEXT = {
   skin: "Skin",
   noSuit: "The game data has no suit for this character, so it can't be played as a Warframe. You can still make a skin from it.",
   emptySlot: "Empty slot",
+  useAnimations: "Use this character's animations (might fix heigh and body collapsing issues but will disable regular Warframe movements",
   batchAdd: "Add to selection",
   batchBuilding: "Building {0} of {1}",
   batchDone: "Downloaded {0} patches.",
