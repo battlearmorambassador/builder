@@ -45,7 +45,7 @@ function pathSearch(input, load) {
     if (id !== search) return;
     const hits = q.length < 2 ? [] : data.map((i) => {
       const n = plain(i.name), at = n.indexOf(qn);
-      const rank = n === qn ? 0 : at === 0 ? 1 : at > 0 ? 2 : words.every((w) => n.includes(w)) ? 3 : (i.path + " " + (i.shown || "")).toLowerCase().includes(q) ? 4 : -1;
+      const rank = n === qn ? 0 : at === 0 ? 1 : at > 0 ? 2 : words.every((w) => n.includes(w) || plain(i.shown || "").includes(w)) ? 3 : q.includes("/") && i.path.toLowerCase().includes(q) ? 4 : -1;
       return [rank, i];
     }).filter(([r]) => r >= 0).sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length).map(([, i]) => i);
     const done = hits.length === 1 && [hits[0].name.toLowerCase(), hits[0].path.toLowerCase()].includes(q);

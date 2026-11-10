@@ -269,7 +269,7 @@ async function loadList(cat) {
       else sub = def.sub[e.productCategory] || T.other;
       const name = cleanName(e.name, path);
       const flag = e.isFrivolous ? "impostor" : e.isStarter ? "flawed" : null;
-      items.push({ path, name, icon: e.icon, sub, cat, raw: e, flag, search: (name + " " + path + " " + (flag || "")).toLowerCase() });
+      items.push({ path, name, icon: e.icon, sub, cat, raw: e, flag });
     }
   });
   items.sort((a, b) => a.name.localeCompare(b.name));

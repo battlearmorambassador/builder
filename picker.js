@@ -113,8 +113,8 @@ function setSub(s) {
 }
 
 function filterPicker() {
-  const q = $("#search").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  pick.filtered = pick.items.filter((i) => (!pick.sub || i.sub === pick.sub) && q.every((w) => i.search.includes(w)));
+  const raw = $("#search").value.trim().toLowerCase(), byPath = raw.includes("/"), q = (byPath ? raw : plain(raw)).split(/\s+/).filter(Boolean);
+  pick.filtered = pick.items.filter((i) => (!pick.sub || i.sub === pick.sub) && q.every((w) => (byPath ? i.path.toLowerCase() : plain(i.name + " " + (i.flag || ""))).includes(w)));
   pick.shown = 0;
   $("#grid").replaceChildren();
   morePicker();
